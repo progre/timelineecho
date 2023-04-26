@@ -1,121 +1,26 @@
 use anyhow::Result;
 use chrono::Utc;
 use reqwest::{header::CONTENT_TYPE, Body};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::{json, Value};
-use tracing::error;
 
-use crate::store::{
-    self,
-    Facet::{Link, Mention},
+use crate::{
+    protocols::at_proto::procedure,
+    store::{
+        self,
+        Facet::{Link, Mention},
+    },
 };
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Session {
-    did: String,
-    handle: String,
-    email: String,
-    access_jwt: String,
-    refresh_jwt: String,
+use super::{query, Session};
+
+pub struct Repo {
+    origin: String,
 }
 
-pub struct Api {
-    pub origin: String,
-}
-
-impl Api {
+impl Repo {
     pub fn new(origin: String) -> Self {
         Self { origin }
-    }
-
-    async fn _query<T: DeserializeOwned, U: Serialize + ?Sized>(
-        &self,
-        client: &reqwest::Client,
-        token: &str,
-        lexicon_id: &str,
-        query: &U,
-    ) -> Result<T> {
-        let resp = client
-            .get(format!("{}/xrpc/{}", self.origin, lexicon_id))
-            .query(query)
-            .bearer_auth(token)
-            .send()
-            .await?;
-        if let Err(err) = resp.error_for_status_ref() {
-            let json: Value = resp.json().await?;
-            error!(
-                "url={:?}, status-code={:?}, body={}",
-                err.url().map(ToString::to_string),
-                err.status(),
-                json
-            );
-            return Err(err.into());
-        }
-        Ok(resp.json().await?)
-    }
-
-    async fn procedure<T: DeserializeOwned>(
-        &self,
-        client: &reqwest::Client,
-        token: &str,
-        lexicon_id: &str,
-        properties: &Value,
-    ) -> Result<T> {
-        let resp = client
-            .post(format!("{}/xrpc/{}", self.origin, lexicon_id))
-            .bearer_auth(token)
-            .json(properties)
-            .send()
-            .await?;
-        if let Err(err) = resp.error_for_status_ref() {
-            let json: Value = resp.json().await?;
-            error!(
-                "url={:?}, status-code={:?}, body={}",
-                err.url().map(ToString::to_string),
-                err.status(),
-                json
-            );
-            return Err(err.into());
-        }
-        Ok(resp.json().await?)
-    }
-
-    pub async fn create_session(
-        &self,
-        client: &reqwest::Client,
-        identifier: &str,
-        password: &str,
-    ) -> Result<Session> {
-        let lexicon_id = "com.atproto.server.createSession";
-        let properties = &json!({
-            "identifier": identifier,
-            "password": password
-        });
-        Ok(client
-            .post(format!("{}/xrpc/{}", self.origin, lexicon_id))
-            .json(properties)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
-    }
-
-    pub async fn _refresh_session(
-        &self,
-        client: &reqwest::Client,
-        session: &Session,
-    ) -> Result<Value> {
-        let lexicon_id = "com.atproto.server.refreshSession";
-        Ok(client
-            .post(format!("{}/xrpc/{}", self.origin, lexicon_id))
-            .bearer_auth(&session.refresh_jwt)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?)
     }
 
     pub async fn create_record(
@@ -164,8 +69,9 @@ impl Api {
                 "images": images.iter().map(|(image, alt)| json!({"image": image, "alt": alt})).collect::<Vec<_>>(),
             }))
         };
-        self.procedure(
+        procedure(
             client,
+            &self.origin,
             &session.access_jwt,
             lexicon_id,
             &json!({
@@ -188,15 +94,15 @@ impl Api {
         session: &Session,
         rkey: &str,
     ) -> Result<Value> {
+        let token = &session.access_jwt;
         let lexicon_id = "com.atproto.repo.getRecord";
-        let query = &[
+        let query_params = &[
             ("repo", session.did.as_str()),
             ("collection", "app.bsky.feed.post"),
             ("rkey", rkey),
         ];
 
-        self._query(client, &session.access_jwt, lexicon_id, query)
-            .await
+        query(client, &self.origin, token, lexicon_id, query_params).await
     }
 
     pub async fn _list_records(
@@ -204,14 +110,14 @@ impl Api {
         client: &reqwest::Client,
         session: &Session,
     ) -> Result<Value> {
+        let token = &session.access_jwt;
         let lexicon_id = "com.atproto.repo.listRecords";
-        let query = &[
+        let query_params = &[
             ("repo", session.did.as_str()),
             ("collection", "app.bsky.feed.post"),
         ];
 
-        self._query(client, &session.access_jwt, lexicon_id, query)
-            .await
+        query(client, &self.origin, token, lexicon_id, query_params).await
     }
 
     pub async fn upload_blob(

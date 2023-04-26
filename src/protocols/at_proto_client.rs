@@ -4,7 +4,7 @@ use reqwest::header::CONTENT_TYPE;
 
 use crate::store::{Facet, Medium};
 
-use super::at_proto_api::{Api, Session};
+use super::at_proto::{Api, Session};
 
 pub struct Client {
     api: Api,
@@ -45,6 +45,7 @@ impl Client {
             None => {
                 let session = self
                     .api
+                    .server
                     .create_session(&self.http_client, &self.identifier, &self.password)
                     .await?;
                 self.session = Some(session);
@@ -63,6 +64,7 @@ impl Client {
 
             let mut res = self
                 .api
+                .repo
                 .upload_blob(&self.http_client, session, content_type, resp)
                 .await?;
             array.push((
@@ -74,6 +76,7 @@ impl Client {
         }
         let res = self
             .api
+            .repo
             .create_record(&self.http_client, session, content, facets, &array)
             .await?;
         let uri = res
