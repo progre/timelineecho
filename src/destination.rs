@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::{
     app::commit,
@@ -49,7 +49,7 @@ pub async fn post(
                 };
                 match operation {
                     Create {
-                        src_status_idenfitier,
+                        src_status_identifier,
                         content,
                         facets,
                         media,
@@ -60,18 +60,26 @@ pub async fn post(
                             0,
                             store::DestinationStatus {
                                 identifier,
-                                src_identifier: src_status_idenfitier,
+                                src_identifier: src_status_identifier,
                             },
                         );
                     }
                     Update {
-                        src_status_idenfitier: _,
+                        src_status_identifier: _,
                         content: _,
                         facets: _,
                     } => todo!(),
-                    Delete {
-                        src_status_idenfitier: _,
-                    } => todo!(),
+                    Delete { identifier } => {
+                        client.delete(&identifier).await?;
+                        let idx = stored_dst
+                            .statuses
+                            .iter()
+                            .position(|status| status.identifier == identifier)
+                            .ok_or_else(|| {
+                                anyhow!("status not found(identifier={})", identifier)
+                            })?;
+                        stored_dst.statuses.remove(idx);
+                    }
                 }
             }
             commit(store).await?;

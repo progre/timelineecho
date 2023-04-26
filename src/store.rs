@@ -59,7 +59,7 @@ pub struct External {
 pub enum Operation {
     #[serde(rename_all = "camelCase")]
     Create {
-        src_status_idenfitier: String,
+        src_status_identifier: String,
         content: String,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         #[serde(default)]
@@ -72,13 +72,13 @@ pub enum Operation {
     },
     #[serde(rename_all = "camelCase")]
     Update {
-        src_status_idenfitier: String,
+        src_status_identifier: String,
         content: String,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         facets: Vec<Facet>,
     },
     #[serde(rename_all = "camelCase")]
-    Delete { src_status_idenfitier: String },
+    Delete { identifier: String },
 }
 
 #[derive(Deserialize, Serialize)]
@@ -127,6 +127,12 @@ pub struct Store {
 }
 
 impl Store {
+    pub fn get_user(&self, origin: &str, identifier: &str) -> Option<&User> {
+        self.users
+            .iter()
+            .find(|user| user.src.origin == origin && user.src.identifier == identifier)
+    }
+
     pub fn get_or_create_user<'a>(&'a mut self, origin: &str, identifier: &str) -> &'a mut User {
         let idx = self
             .users

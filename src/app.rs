@@ -15,7 +15,7 @@ pub async fn commit(store: &Store) -> Result<()> {
 
 async fn execute_per_user(config_user: &config::User, store: &mut store::Store) -> Result<()> {
     let (identifier, source_statuses, operations) =
-        fetch_new_statuses(&config_user.src, &store.users).await?;
+        fetch_new_statuses(&config_user.src, store).await?;
     let stored_user = store.get_or_create_user(config_user.src.origin(), &identifier);
 
     if stored_user.dsts.iter().all(|dst| dst.operations.is_empty()) {
@@ -23,7 +23,10 @@ async fn execute_per_user(config_user: &config::User, store: &mut store::Store) 
         for config_dst in &config_user.dsts {
             let dst = stored_user.get_or_create_dst(config_dst.origin(), config_dst.identifier());
             assert!(dst.operations.is_empty());
-            dst.operations = operations.clone();
+            dst.operations = operations
+                .iter()
+                .filter_map(|operation| operation.to_store(&dst.statuses))
+                .collect();
         }
         commit(store).await?;
     }

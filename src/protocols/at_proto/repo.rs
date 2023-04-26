@@ -3,6 +3,7 @@ use chrono::Utc;
 use reqwest::{header::CONTENT_TYPE, Body};
 use serde::Serialize;
 use serde_json::{json, Value};
+use tracing::error;
 
 use crate::{
     protocols::at_proto::procedure,
@@ -109,6 +110,39 @@ impl Repo {
             }),
         )
         .await
+    }
+
+    pub async fn delete_record(
+        &self,
+        client: &reqwest::Client,
+        session: &Session,
+        rkey: &str,
+    ) -> Result<()> {
+        let lexicon_id = "com.atproto.repo.deleteRecord";
+        let properties = &json!({
+            "repo": &session.did,
+            "collection": "app.bsky.feed.post",
+            "rkey": rkey
+        });
+
+        let resp = client
+            .post(format!("{}/xrpc/{}", &self.origin, lexicon_id))
+            .bearer_auth(&session.access_jwt)
+            .json(properties)
+            .send()
+            .await?;
+        if let Err(err) = resp.error_for_status_ref() {
+            let json: Value = resp.json().await?;
+            error!(
+                "url={:?}, status-code={:?}, body={}",
+                err.url().map(ToString::to_string),
+                err.status(),
+                json
+            );
+            return Err(err.into());
+        }
+        // NOTE: 空文字が返る
+        Ok(())
     }
 
     #[allow(unused)]

@@ -125,4 +125,25 @@ impl Client {
             .to_owned();
         Ok(rid)
     }
+
+    pub async fn delete(&mut self, rkey: &str) -> Result<()> {
+        let session = match &self.session {
+            Some(some) => some,
+            None => {
+                let session = self
+                    .api
+                    .server
+                    .create_session(&self.http_client, &self.identifier, &self.password)
+                    .await?;
+                self.session = Some(session);
+                self.session.as_ref().unwrap()
+            }
+        };
+
+        self.api
+            .repo
+            .delete_record(&self.http_client, session, rkey)
+            .await?;
+        Ok(())
+    }
 }

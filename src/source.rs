@@ -6,12 +6,51 @@ use crate::{
     store,
 };
 
+#[derive(Clone)]
 pub struct Status {
     pub identifier: String,
     pub content: String,
     pub facets: Vec<store::Facet>,
     pub media: Vec<store::Medium>,
     pub external: Option<store::External>,
+}
+
+pub enum Operation {
+    Create(Status),
+    Update {
+        src_status_identifier: String,
+        content: String,
+        facets: Vec<store::Facet>,
+    },
+    Delete {
+        src_status_identifier: String,
+    },
+}
+impl Operation {
+    pub fn to_store(&self, dst_statuses: &[store::DestinationStatus]) -> Option<store::Operation> {
+        match self {
+            Operation::Create(src) => Some(store::Operation::Create {
+                src_status_identifier: src.identifier.clone(),
+                content: src.content.clone(),
+                facets: src.facets.clone(),
+                media: src.media.clone(),
+                external: src.external.clone(),
+            }),
+            Operation::Update {
+                src_status_identifier: _,
+                content: _,
+                facets: _,
+            } => todo!(),
+            Operation::Delete {
+                src_status_identifier,
+            } => dst_statuses
+                .iter()
+                .find(|dst| &dst.src_identifier == src_status_identifier)
+                .map(|dst| store::Operation::Delete {
+                    identifier: dst.identifier.clone(),
+                }),
+        }
+    }
 }
 
 fn client(account: &Account) -> Client {
@@ -30,10 +69,11 @@ fn client(account: &Account) -> Client {
     }
 }
 
-fn create_operations(
-    live_statuses: &[Status],
-    stored_statuses: &[store::SourceStatus],
-) -> Vec<store::Operation> {
+fn create_operations(live_statuses: &[Status], user: Option<&store::User>) -> Vec<Operation> {
+    let Some(user) = user else {
+        return vec![];
+    };
+    let stored_statuses = &user.src.statuses;
     if live_statuses.is_empty() || stored_statuses.is_empty() {
         return vec![];
     }
@@ -51,13 +91,7 @@ fn create_operations(
                 true
             }
         })
-        .map(|live| store::Operation::Create {
-            src_status_idenfitier: live.identifier.clone(),
-            content: live.content.clone(),
-            facets: live.facets.clone(),
-            media: live.media.clone(),
-            external: live.external.clone(),
-        });
+        .map(|status| Operation::Create(status.clone()));
 
     // UD
     let since_id = &live_statuses
@@ -70,13 +104,13 @@ fn create_operations(
         .filter(|stored| &stored.identifier >= since_id)
         .filter_map(|stored| {
             let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
-                return Some(store::Operation::Delete {
-                    src_status_idenfitier: stored.identifier.clone(),
+                return Some(Operation::Delete {
+                    src_status_identifier: stored.identifier.clone(),
                 });
             };
             if live.content != stored.content {
-                return Some(store::Operation::Update {
-                    src_status_idenfitier: live.identifier.clone(),
+                return Some(Operation::Update {
+                    src_status_identifier: live.identifier.clone(),
                     content: live.content.clone(),
                     facets: live.facets.clone(),
                 });
@@ -89,19 +123,15 @@ fn create_operations(
 
 pub async fn fetch_new_statuses(
     account: &Account,
-    stored_users: &[store::User],
-) -> Result<(String, Vec<store::SourceStatus>, Vec<store::Operation>)> {
+    store: &store::Store,
+) -> Result<(String, Vec<store::SourceStatus>, Vec<Operation>)> {
     let mut client = client(account);
 
     let (identifier, statuses) = client.fetch_statuses().await?;
 
-    let operations = create_operations(
-        &statuses,
-        stored_users
-            .iter()
-            .find(|user| user.src.origin == account.origin() && user.src.identifier == identifier)
-            .map_or(&[], |user| &user.src.statuses),
-    );
+    let user = store.get_user(account.origin(), &identifier);
+
+    let operations = create_operations(&statuses, user);
     Ok((
         identifier,
         statuses
