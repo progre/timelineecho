@@ -120,6 +120,12 @@ impl Client {
                             alt: media.description.unwrap_or_default(),
                         })
                         .collect(),
+                    external: status.card.map(|card| store::External {
+                        uri: card.url,
+                        title: card.title,
+                        description: card.description,
+                        thumb_url: card.image.unwrap_or_default(),
+                    }),
                 }
             })
             .rev()

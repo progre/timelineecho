@@ -53,8 +53,9 @@ pub async fn post(
                         content,
                         facets,
                         media,
+                        external,
                     } => {
-                        let identifier = client.post(&content, &facets, &media).await?;
+                        let identifier = client.post(&content, &facets, media, external).await?;
                         stored_dst.statuses.insert(
                             0,
                             store::DestinationStatus {

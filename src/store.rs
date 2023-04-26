@@ -46,6 +46,15 @@ pub struct Medium {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct External {
+    pub uri: String,
+    pub title: String,
+    pub description: String,
+    pub thumb_url: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "operation")]
 pub enum Operation {
     #[serde(rename_all = "camelCase")]
@@ -53,9 +62,13 @@ pub enum Operation {
         src_status_idenfitier: String,
         content: String,
         #[serde(skip_serializing_if = "Vec::is_empty")]
+        #[serde(default)]
         facets: Vec<Facet>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
+        #[serde(default)]
         media: Vec<Medium>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        external: Option<External>,
     },
     #[serde(rename_all = "camelCase")]
     Update {

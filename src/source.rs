@@ -11,6 +11,7 @@ pub struct Status {
     pub content: String,
     pub facets: Vec<store::Facet>,
     pub media: Vec<store::Medium>,
+    pub external: Option<store::External>,
 }
 
 fn client(account: &Account) -> Client {
@@ -55,6 +56,7 @@ fn create_operations(
             content: live.content.clone(),
             facets: live.facets.clone(),
             media: live.media.clone(),
+            external: live.external.clone(),
         });
 
     // UD

@@ -2,9 +2,12 @@ use anyhow::{anyhow, Result};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
 
-use crate::store::{Facet, Medium};
+use crate::store;
 
-use super::at_proto::{Api, Session};
+use super::at_proto::{
+    repo::{Embed, External, Image},
+    Api, Session,
+};
 
 pub struct Client {
     api: Api,
@@ -37,8 +40,9 @@ impl Client {
     pub async fn post(
         &mut self,
         content: &str,
-        facets: &[Facet],
-        images: &[Medium],
+        facets: &[store::Facet],
+        images: Vec<store::Medium>,
+        external: Option<store::External>,
     ) -> Result<String> {
         let session = match &self.session {
             Some(some) => some,
@@ -52,9 +56,32 @@ impl Client {
                 self.session.as_ref().unwrap()
             }
         };
-        let mut array = Vec::new();
-        for image in images {
-            let resp = self.http_client.get(&image.url).send().await?;
+        let embed = if !images.is_empty() {
+            let mut array = Vec::new();
+            for image in images {
+                let resp = self.http_client.get(&image.url).send().await?;
+                let content_type = resp
+                    .headers()
+                    .get(CONTENT_TYPE)
+                    .ok_or_else(|| anyhow!("no content-type"))?
+                    .to_str()?
+                    .to_owned();
+
+                let mut res = self
+                    .api
+                    .repo
+                    .upload_blob(&self.http_client, session, content_type, resp)
+                    .await?;
+                let alt = image.alt;
+                let image = res
+                    .get_mut("blob")
+                    .ok_or_else(|| anyhow!("blob not found"))?
+                    .take();
+                array.push(Image { image, alt });
+            }
+            Some(Embed::Images(array))
+        } else if let Some(external) = external {
+            let resp = self.http_client.get(&external.thumb_url).send().await?;
             let content_type = resp
                 .headers()
                 .get(CONTENT_TYPE)
@@ -67,17 +94,24 @@ impl Client {
                 .repo
                 .upload_blob(&self.http_client, session, content_type, resp)
                 .await?;
-            array.push((
-                res.get_mut("blob")
-                    .ok_or_else(|| anyhow!("blob not found"))?
-                    .take(),
-                image.alt.clone(),
-            ));
-        }
+            let thumb = res
+                .get_mut("blob")
+                .ok_or_else(|| anyhow!("blob not found"))?
+                .take();
+
+            Some(Embed::External(External {
+                uri: external.uri,
+                title: external.title,
+                description: external.description,
+                thumb,
+            }))
+        } else {
+            None
+        };
         let res = self
             .api
             .repo
-            .create_record(&self.http_client, session, content, facets, &array)
+            .create_record(&self.http_client, session, content, facets, embed.as_ref())
             .await?;
         let uri = res
             .get("uri")

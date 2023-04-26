@@ -14,6 +14,27 @@ use crate::{
 
 use super::{query, Session};
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct External {
+    pub uri: String,
+    pub title: String,
+    pub description: String,
+    pub thumb: Value,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Image {
+    pub image: Value,
+    pub alt: String,
+}
+
+pub enum Embed {
+    External(External),
+    Images(Vec<Image>),
+}
+
 pub struct Repo {
     origin: String,
 }
@@ -29,7 +50,7 @@ impl Repo {
         session: &Session,
         text: &str,
         facets: &[store::Facet],
-        images: &[(Value, String)],
+        embed: Option<&Embed>,
     ) -> Result<Value> {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -61,14 +82,16 @@ impl Repo {
                 }),
             })
             .collect::<Vec<_>>();
-        let embed = if images.is_empty() {
-            None
-        } else {
-            Some(json!({
+        let embed = embed.map(|embed| match embed {
+            Embed::External(external) => json!({
+                "$type": "app.bsky.embed.external",
+                "external": external,
+            }),
+            Embed::Images(images) => json!({
                 "$type": "app.bsky.embed.images",
-                "images": images.iter().map(|(image, alt)| json!({"image": image, "alt": alt})).collect::<Vec<_>>(),
-            }))
-        };
+                "images": images,
+            }),
+        });
         procedure(
             client,
             &self.origin,
@@ -88,7 +111,8 @@ impl Repo {
         .await
     }
 
-    pub async fn _get_record(
+    #[allow(unused)]
+    pub async fn get_record(
         &self,
         client: &reqwest::Client,
         session: &Session,
