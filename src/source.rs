@@ -1,7 +1,9 @@
 use anyhow::Result;
+use itertools::Itertools;
 
 use crate::{
-    config::Account,
+    app::commit,
+    config::{self, Account},
     protocols::megalodon_client::{self, Client},
     store,
 };
@@ -69,11 +71,10 @@ fn client(account: &Account) -> Client {
     }
 }
 
-fn create_operations(live_statuses: &[Status], user: Option<&store::User>) -> Vec<Operation> {
-    let Some(user) = user else {
-        return vec![];
-    };
-    let stored_statuses = &user.src.statuses;
+fn create_operations(
+    live_statuses: &[Status],
+    stored_statuses: &[store::SourceStatus],
+) -> Vec<Operation> {
     if live_statuses.is_empty() || stored_statuses.is_empty() {
         return vec![];
     }
@@ -84,13 +85,7 @@ fn create_operations(live_statuses: &[Status], user: Option<&store::User>) -> Ve
         .map(|x| &x.identifier);
     let c = live_statuses
         .iter()
-        .filter(|live| {
-            if let Some(last_id) = last_id {
-                &live.identifier > last_id
-            } else {
-                true
-            }
-        })
+        .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
         .map(|status| Operation::Create(status.clone()));
 
     // UD
@@ -121,26 +116,48 @@ fn create_operations(live_statuses: &[Status], user: Option<&store::User>) -> Ve
     c.chain(ud).collect()
 }
 
-pub async fn fetch_new_statuses(
-    account: &Account,
-    store: &store::Store,
-) -> Result<(String, Vec<store::SourceStatus>, Vec<Operation>)> {
-    let mut client = client(account);
-
+pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result<String> {
+    let mut client = client(&config_user.src);
     let (identifier, statuses) = client.fetch_statuses().await?;
 
-    let user = store.get_user(account.origin(), &identifier);
+    let stored_user = store.get_or_create_user(config_user.src.origin(), &identifier);
+    if stored_user
+        .dsts
+        .iter()
+        .any(|dst| !dst.operations.is_empty())
+    {
+        return Ok(identifier);
+    }
 
-    let operations = create_operations(&statuses, user);
-    Ok((
-        identifier,
-        statuses
-            .into_iter()
-            .map(|status| store::SourceStatus {
-                identifier: status.identifier,
-                content: status.content,
-            })
-            .collect(),
-        operations,
-    ))
+    let src = &mut stored_user.src;
+    let operations = create_operations(&statuses, &src.statuses);
+    let new_statuses: Vec<_> = statuses
+        .into_iter()
+        .map(|status| store::SourceStatus {
+            identifier: status.identifier,
+            content: status.content,
+        })
+        .collect();
+    let scoped_src_status_identifiers: Vec<_> = new_statuses
+        .iter()
+        .chain(&src.statuses)
+        .map(|status| status.identifier.clone())
+        .unique()
+        .collect();
+    src.statuses = new_statuses;
+
+    for config_dst in &config_user.dsts {
+        let dst = stored_user.get_or_create_dst(config_dst.origin(), config_dst.identifier());
+
+        assert!(dst.operations.is_empty());
+        dst.operations = operations
+            .iter()
+            .filter_map(|operation| operation.to_store(&dst.statuses))
+            .collect();
+
+        dst.statuses
+            .retain(|status| scoped_src_status_identifiers.contains(&status.src_identifier));
+    }
+    commit(store).await?;
+    Ok(identifier)
 }

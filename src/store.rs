@@ -127,12 +127,6 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn get_user(&self, origin: &str, identifier: &str) -> Option<&User> {
-        self.users
-            .iter()
-            .find(|user| user.src.origin == origin && user.src.identifier == identifier)
-    }
-
     pub fn get_or_create_user<'a>(&'a mut self, origin: &str, identifier: &str) -> &'a mut User {
         let idx = self
             .users
