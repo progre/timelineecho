@@ -1,18 +1,11 @@
 use anyhow::Result;
 use atrium_api::app::bsky::feed::post::ReplyRef;
-use chrono::Utc;
 use reqwest::{header::CONTENT_TYPE, Body};
 use serde::Serialize;
 use serde_json::{json, Value};
 use tracing::error;
 
-use crate::{
-    protocols::at_proto::procedure,
-    store::{
-        self,
-        Facet::{Link, Mention},
-    },
-};
+use crate::protocols::at_proto::procedure;
 
 use super::{query, Session};
 
@@ -37,6 +30,18 @@ pub enum Embed {
     Images(Vec<Image>),
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Record<'a> {
+    pub text: &'a str,
+    pub facets: Vec<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply: Option<ReplyRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub embed: Option<Value>,
+    pub created_at: &'a str,
+}
+
 pub struct Repo {
     origin: String,
 }
@@ -50,62 +55,9 @@ impl Repo {
         &self,
         client: &reqwest::Client,
         session: &Session,
-        text: &str,
-        facets: &[store::Facet],
-        reply: Option<ReplyRef>,
-        embed: Option<&Embed>,
+        record: Record<'_>,
     ) -> Result<Value> {
-        #[derive(Serialize)]
-        #[serde(rename_all = "camelCase")]
-        struct Record<'a> {
-            text: &'a str,
-            facets: &'a Vec<Value>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            reply: Option<ReplyRef>,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            embed: Option<&'a Value>,
-            created_at: String,
-        }
-
         let lexicon_id = "com.atproto.repo.createRecord";
-        let facets = facets
-            .iter()
-            .map(|facet| match facet {
-                Mention {
-                    byte_slice,
-                    identifier,
-                } => json!({
-                    "index": {
-                        "byteStart": byte_slice.start,
-                        "byteEnd": byte_slice.end
-                    },
-                    "features": [{
-                        "$type": "app.bsky.richtext.facet#mention",
-                        "did": identifier,
-                    }]
-                }),
-                Link { byte_slice, uri } => json!({
-                    "index": {
-                        "byteStart": byte_slice.start,
-                        "byteEnd": byte_slice.end
-                    },
-                    "features": [{
-                        "$type": "app.bsky.richtext.facet#link",
-                        "uri": uri,
-                    }]
-                }),
-            })
-            .collect::<Vec<_>>();
-        let embed = embed.map(|embed| match embed {
-            Embed::External(external) => json!({
-                "$type": "app.bsky.embed.external",
-                "external": external,
-            }),
-            Embed::Images(images) => json!({
-                "$type": "app.bsky.embed.images",
-                "images": images,
-            }),
-        });
         procedure(
             client,
             &self.origin,
@@ -114,13 +66,7 @@ impl Repo {
             &json!({
                 "repo": &session.did,
                 "collection": "app.bsky.feed.post",
-                "record": Record {
-                  text,
-                  facets: &facets,
-                  reply,
-                  embed: embed.as_ref(),
-                  created_at: Utc::now().to_rfc3339(),
-                }
+                "record": &record,
             }),
         )
         .await

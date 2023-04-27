@@ -10,11 +10,6 @@ use crate::{
     },
 };
 
-pub struct Reply {
-    pub root_identifier: String,
-    pub parent_identifier: String,
-}
-
 async fn post_per_dst(
     src_origin: &str,
     src_identifier: &str,
@@ -36,26 +31,23 @@ async fn post_per_dst(
                 reply_src_status_identifier,
                 media,
                 external,
+                created_at,
             } => {
                 let dst_statuses = &mut stored_dst.statuses;
                 let identifier = client
                     .post(
                         &content,
                         &facets,
-                        reply_src_status_identifier
-                            .and_then(|reply| {
-                                let dst_identifier = &dst_statuses
-                                    .iter()
-                                    .find(|dst| dst.src_identifier == reply)?
-                                    .identifier;
-                                Some(Reply {
-                                    root_identifier: dst_identifier.clone(),
-                                    parent_identifier: dst_identifier.clone(),
-                                })
-                            })
-                            .as_ref(),
+                        reply_src_status_identifier.and_then(|reply| {
+                            let dst_identifier = &dst_statuses
+                                .iter()
+                                .find(|dst| dst.src_identifier == reply)?
+                                .identifier;
+                            Some(dst_identifier.as_str())
+                        }),
                         media,
                         external,
+                        &created_at,
                     )
                     .await?;
                 dst_statuses.insert(

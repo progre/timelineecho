@@ -70,6 +70,7 @@ pub enum Operation {
         media: Vec<Medium>,
         #[serde(skip_serializing_if = "Option::is_none")]
         external: Option<External>,
+        created_at: String,
     },
     #[serde(rename_all = "camelCase")]
     Update {

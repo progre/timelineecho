@@ -16,6 +16,7 @@ pub struct Status {
     pub reply_identifier: Option<String>,
     pub media: Vec<store::Medium>,
     pub external: Option<store::External>,
+    pub created_at: String,
 }
 
 pub enum Operation {
@@ -29,6 +30,7 @@ pub enum Operation {
         src_status_identifier: String,
     },
 }
+
 impl Operation {
     pub fn to_store(&self, dst_statuses: &[store::DestinationStatus]) -> Option<store::Operation> {
         match self {
@@ -39,6 +41,7 @@ impl Operation {
                 reply_src_status_identifier: src.reply_identifier.clone(),
                 media: src.media.clone(),
                 external: src.external.clone(),
+                created_at: src.created_at.clone(),
             }),
             Operation::Update {
                 src_status_identifier: _,

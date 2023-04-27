@@ -127,6 +127,7 @@ impl Client {
                         description: card.description,
                         thumb_url: card.image.unwrap_or_default(),
                     }),
+                    created_at: status.created_at.to_rfc3339(),
                 }
             })
             .rev()
