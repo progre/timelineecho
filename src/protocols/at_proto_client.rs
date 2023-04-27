@@ -1,8 +1,10 @@
 use anyhow::{anyhow, Result};
+use atrium_api::{app::bsky::feed::post::ReplyRef, com::atproto::repo::strong_ref};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
+use serde_json::Value;
 
-use crate::store;
+use crate::{destination::Reply, store};
 
 use super::at_proto::{
     repo::{Embed, External, Image},
@@ -41,6 +43,7 @@ impl Client {
         &mut self,
         content: &str,
         facets: &[store::Facet],
+        reply: Option<&Reply>,
         images: Vec<store::Medium>,
         external: Option<store::External>,
     ) -> Result<String> {
@@ -56,6 +59,14 @@ impl Client {
                 self.session.as_ref().unwrap()
             }
         };
+
+        let reply: Option<ReplyRef> = reply
+            .map(|reply| -> Result<ReplyRef> {
+                let parent: strong_ref::Main = serde_json::from_str(&reply.parent_identifier)?;
+                let root: strong_ref::Main = serde_json::from_str(&reply.root_identifier)?;
+                Ok(ReplyRef { parent, root })
+            })
+            .transpose()?;
         let embed = if !images.is_empty() {
             let mut array = Vec::new();
             for image in images {
@@ -108,25 +119,35 @@ impl Client {
         } else {
             None
         };
-        let res = self
+
+        let output = self
             .api
             .repo
-            .create_record(&self.http_client, session, content, facets, embed.as_ref())
+            .create_record(
+                &self.http_client,
+                session,
+                content,
+                facets,
+                reply,
+                embed.as_ref(),
+            )
             .await?;
-        let uri = res
+        Ok(serde_json::to_string(&output)?)
+    }
+
+    pub async fn delete(&mut self, identifier: &str) -> Result<()> {
+        let json: Value = serde_json::from_str(identifier)?;
+        let uri = json
             .get("uri")
             .ok_or_else(|| anyhow!("uri not found"))?
             .as_str()
             .ok_or_else(|| anyhow!("uri is not string"))?;
-        let rid = Regex::new(r"at://did:plc:.+?/app.bsky.feed.post/(.+)")
+        let rkey = Regex::new(r"at://did:plc:.+?/app.bsky.feed.post/(.+)")
             .unwrap()
             .captures(uri)
             .ok_or_else(|| anyhow!("invalid uri format"))?[1]
             .to_owned();
-        Ok(rid)
-    }
 
-    pub async fn delete(&mut self, rkey: &str) -> Result<()> {
         let session = match &self.session {
             Some(some) => some,
             None => {
@@ -142,7 +163,7 @@ impl Client {
 
         self.api
             .repo
-            .delete_record(&self.http_client, session, rkey)
+            .delete_record(&self.http_client, session, &rkey)
             .await?;
         Ok(())
     }

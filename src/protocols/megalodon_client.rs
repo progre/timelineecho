@@ -112,6 +112,7 @@ impl Client {
                     identifier: status.id,
                     content,
                     facets,
+                    reply_identifier: status.in_reply_to_id,
                     media: status
                         .media_attachments
                         .into_iter()

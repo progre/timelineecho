@@ -1,4 +1,5 @@
 use anyhow::Result;
+use atrium_api::app::bsky::feed::post::ReplyRef;
 use chrono::Utc;
 use reqwest::{header::CONTENT_TYPE, Body};
 use serde::Serialize;
@@ -51,6 +52,7 @@ impl Repo {
         session: &Session,
         text: &str,
         facets: &[store::Facet],
+        reply: Option<ReplyRef>,
         embed: Option<&Embed>,
     ) -> Result<Value> {
         #[derive(Serialize)]
@@ -58,6 +60,8 @@ impl Repo {
         struct Record<'a> {
             text: &'a str,
             facets: &'a Vec<Value>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            reply: Option<ReplyRef>,
             #[serde(skip_serializing_if = "Option::is_none")]
             embed: Option<&'a Value>,
             created_at: String,
@@ -68,9 +72,18 @@ impl Repo {
             .iter()
             .map(|facet| match facet {
                 Mention {
-                    byte_slice: _,
-                    identifier: _,
-                } => todo!(),
+                    byte_slice,
+                    identifier,
+                } => json!({
+                    "index": {
+                        "byteStart": byte_slice.start,
+                        "byteEnd": byte_slice.end
+                    },
+                    "features": [{
+                        "$type": "app.bsky.richtext.facet#mention",
+                        "did": identifier,
+                    }]
+                }),
                 Link { byte_slice, uri } => json!({
                     "index": {
                         "byteStart": byte_slice.start,
@@ -104,6 +117,7 @@ impl Repo {
                 "record": Record {
                   text,
                   facets: &facets,
+                  reply,
                   embed: embed.as_ref(),
                   created_at: Utc::now().to_rfc3339(),
                 }
@@ -163,11 +177,8 @@ impl Repo {
         query(client, &self.origin, token, lexicon_id, query_params).await
     }
 
-    pub async fn _list_records(
-        &self,
-        client: &reqwest::Client,
-        session: &Session,
-    ) -> Result<Value> {
+    #[allow(unused)]
+    pub async fn list_records(&self, client: &reqwest::Client, session: &Session) -> Result<Value> {
         let token = &session.access_jwt;
         let lexicon_id = "com.atproto.repo.listRecords";
         let query_params = &[

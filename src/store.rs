@@ -64,6 +64,7 @@ pub enum Operation {
         #[serde(skip_serializing_if = "Vec::is_empty")]
         #[serde(default)]
         facets: Vec<Facet>,
+        reply_src_status_identifier: Option<String>,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         #[serde(default)]
         media: Vec<Medium>,

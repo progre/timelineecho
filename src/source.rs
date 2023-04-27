@@ -13,6 +13,7 @@ pub struct Status {
     pub identifier: String,
     pub content: String,
     pub facets: Vec<store::Facet>,
+    pub reply_identifier: Option<String>,
     pub media: Vec<store::Medium>,
     pub external: Option<store::External>,
 }
@@ -35,6 +36,7 @@ impl Operation {
                 src_status_identifier: src.identifier.clone(),
                 content: src.content.clone(),
                 facets: src.facets.clone(),
+                reply_src_status_identifier: src.reply_identifier.clone(),
                 media: src.media.clone(),
                 external: src.external.clone(),
             }),
