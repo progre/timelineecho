@@ -1,5 +1,6 @@
+use std::convert::Into;
+
 use anyhow::Result;
-use itertools::Itertools;
 
 use crate::{
     app::commit,
@@ -110,33 +111,35 @@ fn create_operations(
 
 pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result<String> {
     let mut client = client(&config_user.src);
-    let (identifier, statuses) = client.fetch_statuses().await?;
+    let (user_identifier, statuses) = client.fetch_statuses().await?;
 
-    let stored_user = store.get_or_create_user(config_user.src.origin(), &identifier);
+    let stored_user = store.get_or_create_user(config_user.src.origin(), &user_identifier);
     if stored_user
         .dsts
         .iter()
         .any(|dst| !dst.operations.is_empty())
     {
-        return Ok(identifier);
+        return Ok(user_identifier);
     }
 
     let src = &mut stored_user.src;
     let operations = create_operations(&statuses, &src.statuses);
-    let new_statuses: Vec<_> = statuses
-        .into_iter()
-        .map(|status| store::SourceStatus {
-            identifier: status.src_identifier,
-            content: status.content,
-        })
-        .collect();
-    let scoped_src_identifiers: Vec<_> = new_statuses
+    src.statuses = statuses.into_iter().map(Into::into).collect();
+
+    let src_identifiers = src.statuses.iter().map(|status| status.identifier.clone());
+    let reply_src_identifiers = operations
         .iter()
-        .chain(&src.statuses)
-        .map(|status| status.identifier.clone())
-        .unique()
-        .collect();
-    src.statuses = new_statuses;
+        .filter_map(|operation| match operation {
+            Operation::Create(create) => Some(create.reply_src_identifier.clone()),
+            Operation::Update {
+                src_identifier: _,
+                content: _,
+                facets: _,
+            }
+            | Operation::Delete { src_identifier: _ } => None,
+        })
+        .flatten();
+    let necessary_src_identifiers: Vec<_> = src_identifiers.chain(reply_src_identifiers).collect();
 
     for config_dst in &config_user.dsts {
         let dst = stored_user.get_or_create_dst(config_dst.origin(), config_dst.identifier());
@@ -148,8 +151,8 @@ pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result
             .collect();
 
         dst.statuses
-            .retain(|status| scoped_src_identifiers.contains(&status.src_identifier));
+            .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
     }
     commit(store).await?;
-    Ok(identifier)
+    Ok(user_identifier)
 }

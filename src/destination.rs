@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 use crate::{
     app::commit,
@@ -65,12 +65,6 @@ async fn post_per_dst(
             } => todo!(),
             Delete { dst_identifier } => {
                 client.delete(&dst_identifier).await?;
-                let idx = stored_dst
-                    .statuses
-                    .iter()
-                    .position(|status| status.identifier == dst_identifier)
-                    .ok_or_else(|| anyhow!("status not found(identifier={})", dst_identifier))?;
-                stored_dst.statuses.remove(idx);
             }
         }
         commit(store).await?;

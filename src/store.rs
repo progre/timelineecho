@@ -9,6 +9,15 @@ pub struct SourceStatus {
     pub content: String,
 }
 
+impl From<CreatingStatus> for SourceStatus {
+    fn from(full: CreatingStatus) -> Self {
+        SourceStatus {
+            identifier: full.src_identifier,
+            content: full.content,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Source {

@@ -11,7 +11,6 @@ atrium-api = { git = "https://github.com/sugyan/atrium.git", version = "0.1.0" }
 chrono = "0.4.24"
 config = { version = "0.13.3", default-features = false, features = ["json5"] }
 html2text = "0.5.1"
-itertools = "0.10.5"
 megalodon = "0.7.0"
 oauth1-request = "0.6.0"
 regex = "1.7.3"
