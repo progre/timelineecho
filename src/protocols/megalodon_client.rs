@@ -4,7 +4,7 @@ use megalodon::{megalodon::GetAccountStatusesInputOptions, Megalodon};
 use reqwest::header::HeaderMap;
 use tracing::{event_enabled, trace, Level};
 
-use crate::{source, store};
+use crate::store;
 
 fn trace_header(header: &HeaderMap) {
     if !event_enabled!(Level::TRACE) {
@@ -86,7 +86,7 @@ impl Client {
         Ok(self.account_id.as_ref().unwrap())
     }
 
-    pub async fn fetch_statuses(&mut self) -> Result<(String, Vec<source::Status>)> {
+    pub async fn fetch_statuses(&mut self) -> Result<(String, Vec<store::CreatingStatus>)> {
         let account_id = self.account_id().await?.to_owned();
         let resp = self
             .megalodon
@@ -108,11 +108,11 @@ impl Client {
                     status.content.as_bytes(),
                     usize::MAX,
                 ));
-                source::Status {
-                    identifier: status.id,
+                store::CreatingStatus {
+                    src_identifier: status.id,
                     content,
                     facets,
-                    reply_identifier: status.in_reply_to_id,
+                    reply_src_identifier: status.in_reply_to_id,
                     media: status
                         .media_attachments
                         .into_iter()

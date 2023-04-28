@@ -17,13 +17,6 @@ pub struct Source {
     pub statuses: Vec<SourceStatus>,
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DestinationStatus {
-    pub identifier: String,
-    pub src_identifier: String,
-}
-
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
@@ -55,32 +48,43 @@ pub struct External {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreatingStatus {
+    pub src_identifier: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub facets: Vec<Facet>,
+    pub reply_src_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub media: Vec<Medium>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external: Option<External>,
+    pub created_at: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "operation")]
 pub enum Operation {
     #[serde(rename_all = "camelCase")]
-    Create {
-        src_status_identifier: String,
-        content: String,
-        #[serde(skip_serializing_if = "Vec::is_empty")]
-        #[serde(default)]
-        facets: Vec<Facet>,
-        reply_src_status_identifier: Option<String>,
-        #[serde(skip_serializing_if = "Vec::is_empty")]
-        #[serde(default)]
-        media: Vec<Medium>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        external: Option<External>,
-        created_at: String,
-    },
+    Create(CreatingStatus),
     #[serde(rename_all = "camelCase")]
     Update {
-        src_status_identifier: String,
+        dst_identifier: String,
         content: String,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         facets: Vec<Facet>,
     },
     #[serde(rename_all = "camelCase")]
-    Delete { identifier: String },
+    Delete { dst_identifier: String },
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DestinationStatus {
+    pub identifier: String,
+    pub src_identifier: String,
 }
 
 #[derive(Deserialize, Serialize)]

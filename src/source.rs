@@ -7,54 +7,41 @@ use crate::{
     protocols::megalodon_client::{self, Client},
     store,
 };
-
-#[derive(Clone)]
-pub struct Status {
-    pub identifier: String,
-    pub content: String,
-    pub facets: Vec<store::Facet>,
-    pub reply_identifier: Option<String>,
-    pub media: Vec<store::Medium>,
-    pub external: Option<store::External>,
-    pub created_at: String,
-}
-
-pub enum Operation {
-    Create(Status),
+enum Operation {
+    Create(store::CreatingStatus),
     Update {
-        src_status_identifier: String,
+        src_identifier: String,
         content: String,
         facets: Vec<store::Facet>,
     },
     Delete {
-        src_status_identifier: String,
+        src_identifier: String,
     },
 }
 
 impl Operation {
     pub fn to_store(&self, dst_statuses: &[store::DestinationStatus]) -> Option<store::Operation> {
         match self {
-            Operation::Create(src) => Some(store::Operation::Create {
-                src_status_identifier: src.identifier.clone(),
-                content: src.content.clone(),
-                facets: src.facets.clone(),
-                reply_src_status_identifier: src.reply_identifier.clone(),
-                media: src.media.clone(),
-                external: src.external.clone(),
-                created_at: src.created_at.clone(),
-            }),
+            Operation::Create(source_status_full) => {
+                Some(store::Operation::Create(source_status_full.clone()))
+            }
             Operation::Update {
-                src_status_identifier: _,
-                content: _,
-                facets: _,
-            } => todo!(),
-            Operation::Delete {
-                src_status_identifier,
+                src_identifier,
+                content,
+                facets,
             } => dst_statuses
                 .iter()
-                .find(|dst| &dst.src_identifier == src_status_identifier)
+                .find(|dst| &dst.src_identifier == src_identifier)
+                .map(|dst| store::Operation::Update {
+                    dst_identifier: dst.identifier.clone(),
+                    content: content.clone(),
+                    facets: facets.clone(),
+                }),
+            Operation::Delete { src_identifier } => dst_statuses
+                .iter()
+                .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| store::Operation::Delete {
-                    identifier: dst.identifier.clone(),
+                    dst_identifier: dst.identifier.clone(),
                 }),
         }
     }
@@ -77,7 +64,7 @@ fn client(account: &Account) -> Client {
 }
 
 fn create_operations(
-    live_statuses: &[Status],
+    live_statuses: &[store::CreatingStatus],
     stored_statuses: &[store::SourceStatus],
 ) -> Vec<Operation> {
     if live_statuses.is_empty() || stored_statuses.is_empty() {
@@ -90,27 +77,27 @@ fn create_operations(
         .map(|x| &x.identifier);
     let c = live_statuses
         .iter()
-        .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
+        .filter(|live| last_id.map_or(true, |last_id| &live.src_identifier > last_id))
         .map(|status| Operation::Create(status.clone()));
 
     // UD
     let since_id = &live_statuses
         .iter()
-        .min_by_key(|status| &status.identifier)
+        .min_by_key(|status| &status.src_identifier)
         .unwrap()
-        .identifier;
+        .src_identifier;
     let ud = stored_statuses
         .iter()
         .filter(|stored| &stored.identifier >= since_id)
         .filter_map(|stored| {
-            let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
+            let Some(live) = live_statuses.iter().find(|live| live.src_identifier == stored.identifier) else {
                 return Some(Operation::Delete {
-                    src_status_identifier: stored.identifier.clone(),
+                    src_identifier: stored.identifier.clone(),
                 });
             };
             if live.content != stored.content {
                 return Some(Operation::Update {
-                    src_status_identifier: live.identifier.clone(),
+                    src_identifier: live.src_identifier.clone(),
                     content: live.content.clone(),
                     facets: live.facets.clone(),
                 });
@@ -139,11 +126,11 @@ pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result
     let new_statuses: Vec<_> = statuses
         .into_iter()
         .map(|status| store::SourceStatus {
-            identifier: status.identifier,
+            identifier: status.src_identifier,
             content: status.content,
         })
         .collect();
-    let scoped_src_status_identifiers: Vec<_> = new_statuses
+    let scoped_src_identifiers: Vec<_> = new_statuses
         .iter()
         .chain(&src.statuses)
         .map(|status| status.identifier.clone())
@@ -161,7 +148,7 @@ pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result
             .collect();
 
         dst.statuses
-            .retain(|status| scoped_src_status_identifiers.contains(&status.src_identifier));
+            .retain(|status| scoped_src_identifiers.contains(&status.src_identifier));
     }
     commit(store).await?;
     Ok(identifier)

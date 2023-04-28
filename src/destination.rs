@@ -24,21 +24,21 @@ async fn post_per_dst(
             break;
         };
         match operation {
-            Create {
-                src_status_identifier,
+            Create(store::CreatingStatus {
+                src_identifier,
                 content,
                 facets,
-                reply_src_status_identifier,
+                reply_src_identifier,
                 media,
                 external,
                 created_at,
-            } => {
+            }) => {
                 let dst_statuses = &mut stored_dst.statuses;
-                let identifier = client
+                let dst_identifier = client
                     .post(
                         &content,
                         &facets,
-                        reply_src_status_identifier.and_then(|reply| {
+                        reply_src_identifier.and_then(|reply| {
                             let dst_identifier = &dst_statuses
                                 .iter()
                                 .find(|dst| dst.src_identifier == reply)?
@@ -53,23 +53,23 @@ async fn post_per_dst(
                 dst_statuses.insert(
                     0,
                     store::DestinationStatus {
-                        identifier,
-                        src_identifier: src_status_identifier,
+                        identifier: dst_identifier,
+                        src_identifier,
                     },
                 );
             }
             Update {
-                src_status_identifier: _,
+                dst_identifier: _,
                 content: _,
                 facets: _,
             } => todo!(),
-            Delete { identifier } => {
-                client.delete(&identifier).await?;
+            Delete { dst_identifier } => {
+                client.delete(&dst_identifier).await?;
                 let idx = stored_dst
                     .statuses
                     .iter()
-                    .position(|status| status.identifier == identifier)
-                    .ok_or_else(|| anyhow!("status not found(identifier={})", identifier))?;
+                    .position(|status| status.identifier == dst_identifier)
+                    .ok_or_else(|| anyhow!("status not found(identifier={})", dst_identifier))?;
                 stored_dst.statuses.remove(idx);
             }
         }
