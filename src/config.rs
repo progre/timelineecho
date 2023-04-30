@@ -16,6 +16,14 @@ pub enum Account {
         origin: String,
         access_token: String,
     },
+    #[serde(rename = "twitter")]
+    #[serde(rename_all = "camelCase")]
+    Twitter {
+        api_key: String,
+        api_key_secret: String,
+        access_token: String,
+        access_token_secret: String,
+    },
 }
 
 #[derive(Deserialize)]
