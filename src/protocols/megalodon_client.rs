@@ -1,4 +1,5 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use html2text::render::text_renderer::RichAnnotation;
 use megalodon::{megalodon::GetAccountStatusesInputOptions, Megalodon};
 use reqwest::header::HeaderMap;
@@ -60,43 +61,46 @@ fn html_to_content_facets(html: &str) -> (String, Vec<store::Facet>) {
 }
 
 pub struct Client {
+    origin: String,
     megalodon: Box<dyn Megalodon>,
-    account_id: Option<String>,
+    account_id: String,
 }
 
 impl Client {
-    pub fn new_mastodon(origin: String, access_token: String) -> Self {
-        Self::new(megalodon::generator(
+    pub async fn new_mastodon(origin: String, access_token: String) -> Result<Self> {
+        let megalodon = megalodon::generator(
             megalodon::SNS::Mastodon,
-            origin,
+            origin.clone(),
             Some(access_token),
             None,
-        ))
-    }
-
-    fn new(megalodon: Box<dyn Megalodon>) -> Self {
-        Self {
-            megalodon,
-            account_id: None,
-        }
-    }
-
-    async fn account_id(&mut self) -> Result<&str> {
-        if self.account_id.is_some() {
-            return Ok(self.account_id.as_ref().unwrap());
-        }
-        let resp = self.megalodon.verify_account_credentials().await?;
+        );
+        let resp = megalodon.verify_account_credentials().await?;
         trace_header(&resp.header);
-        self.account_id = Some(resp.json().id);
-        Ok(self.account_id.as_ref().unwrap())
+        let account_id = resp.json().id;
+
+        Ok(Self {
+            origin,
+            megalodon,
+            account_id,
+        })
+    }
+}
+
+#[async_trait(?Send)]
+impl super::Client for Client {
+    fn origin(&self) -> &str {
+        &self.origin
     }
 
-    pub async fn fetch_statuses(&mut self) -> Result<(String, Vec<store::CreatingStatus>)> {
-        let account_id = self.account_id().await?.to_owned();
+    fn identifier(&self) -> &str {
+        &self.account_id
+    }
+
+    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>> {
         let resp = self
             .megalodon
             .get_account_statuses(
-                account_id.clone(),
+                self.account_id.clone(),
                 Some(&GetAccountStatusesInputOptions {
                     limit: Some(40),
                     // exclude_replies: Some(true), // TODO: include self replies
@@ -136,6 +140,24 @@ impl Client {
             .rev()
             .collect();
 
-        Ok((account_id, statuses))
+        Ok(statuses)
+    }
+
+    #[allow(unused)]
+    async fn post(
+        &mut self,
+        content: &str,
+        facets: &[store::Facet],
+        reply_identifier: Option<&str>,
+        images: Vec<store::Medium>,
+        external: Option<store::External>,
+        created_at: &str,
+    ) -> Result<String> {
+        todo!();
+    }
+
+    #[allow(unused)]
+    async fn delete(&mut self, identifier: &str) -> Result<()> {
+        todo!();
     }
 }

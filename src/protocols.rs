@@ -1,3 +1,49 @@
 mod at_proto;
 pub mod at_proto_client;
 pub mod megalodon_client;
+
+use anyhow::Result;
+use async_trait::async_trait;
+
+use crate::{config, store};
+
+#[async_trait(?Send)]
+pub trait Client {
+    fn origin(&self) -> &str;
+    fn identifier(&self) -> &str;
+
+    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>>;
+
+    async fn post(
+        &mut self,
+        content: &str,
+        facets: &[store::Facet],
+        reply_identifier: Option<&str>,
+        images: Vec<store::Medium>,
+        external: Option<store::External>,
+        created_at: &str,
+    ) -> Result<String>;
+
+    async fn delete(&mut self, identifier: &str) -> Result<()>;
+}
+
+pub async fn create_client(account: &config::Account) -> Result<Box<dyn Client>> {
+    match account {
+        config::Account::AtProtocol {
+            origin,
+            identifier,
+            password,
+        } => Ok(Box::new(at_proto_client::Client::new(
+            origin.into(),
+            reqwest::Client::new(),
+            identifier.into(),
+            password.into(),
+        ))),
+        config::Account::Mastodon {
+            origin,
+            access_token,
+        } => Ok(Box::new(
+            megalodon_client::Client::new_mastodon(origin.clone(), access_token.clone()).await?,
+        )),
+    }
+}

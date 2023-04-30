@@ -2,8 +2,7 @@ use anyhow::Result;
 
 use crate::{
     app::commit,
-    config::Account,
-    protocols::at_proto_client::{self, Client},
+    protocols::Client,
     store::{
         self,
         Operation::{Create, Delete, Update},
@@ -11,15 +10,14 @@ use crate::{
 };
 
 async fn post_per_dst(
-    src_origin: &str,
-    src_identifier: &str,
-    client: &mut Client,
     store: &mut store::Store,
+    src_client: &dyn Client,
+    dst_client: &mut Box<dyn Client>,
 ) -> Result<()> {
     loop {
         let stored_dst = store
-            .get_or_create_user(src_origin, src_identifier)
-            .get_or_create_dst(client.origin(), &client.identifier);
+            .get_or_create_user(src_client.origin(), src_client.identifier())
+            .get_or_create_dst(dst_client.origin(), dst_client.identifier());
         let Some(operation) = stored_dst.operations.pop() else {
             break;
         };
@@ -34,7 +32,7 @@ async fn post_per_dst(
                 created_at,
             }) => {
                 let dst_statuses = &mut stored_dst.statuses;
-                let dst_identifier = client
+                let dst_identifier = dst_client
                     .post(
                         &content,
                         &facets,
@@ -64,7 +62,7 @@ async fn post_per_dst(
                 facets: _,
             } => todo!(),
             Delete { dst_identifier } => {
-                client.delete(&dst_identifier).await?;
+                dst_client.delete(&dst_identifier).await?;
             }
         }
         commit(store).await?;
@@ -72,37 +70,13 @@ async fn post_per_dst(
     Ok(())
 }
 
-fn client(account: &Account) -> Client {
-    match account {
-        Account::Mastodon {
-            origin: _,
-            access_token: _,
-        } => {
-            todo!();
-        }
-        Account::AtProtocol {
-            origin,
-            identifier,
-            password,
-        } => at_proto_client::Client::new(
-            origin.into(),
-            reqwest::Client::new(),
-            identifier.into(),
-            password.into(),
-        ),
-    }
-}
-
 pub async fn post(
-    src_origin: &str,
-    src_identifier: &str,
-    config_dsts: &[Account],
     store: &mut store::Store,
+    src_client: &dyn Client,
+    dst_clients: &mut [Box<dyn Client>],
 ) -> Result<()> {
-    let mut clients = config_dsts.iter().map(client).collect::<Vec<_>>();
-
-    for client in &mut clients {
-        post_per_dst(src_origin, src_identifier, client, store).await?;
+    for dst_client in dst_clients {
+        post_per_dst(store, src_client, dst_client).await?;
     }
 
     Ok(())

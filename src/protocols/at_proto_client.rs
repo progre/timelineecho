@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use atrium_api::{app::bsky::feed::post::ReplyRef, com::atproto::repo::strong_ref};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
@@ -86,12 +87,23 @@ impl Client {
             password,
         }
     }
+}
 
-    pub fn origin(&self) -> &str {
+#[async_trait(?Send)]
+impl super::Client for Client {
+    fn origin(&self) -> &str {
         &self.api.origin
     }
 
-    pub async fn post(
+    fn identifier(&self) -> &str {
+        &self.identifier
+    }
+
+    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>> {
+        todo!()
+    }
+
+    async fn post(
         &mut self,
         content: &str,
         facets: &[store::Facet],
@@ -183,7 +195,7 @@ impl Client {
         Ok(serde_json::to_string(&output)?)
     }
 
-    pub async fn delete(&mut self, identifier: &str) -> Result<()> {
+    async fn delete(&mut self, identifier: &str) -> Result<()> {
         let json: Value = serde_json::from_str(identifier)?;
         let uri = json
             .get("uri")

@@ -2,12 +2,7 @@ use std::convert::Into;
 
 use anyhow::Result;
 
-use crate::{
-    app::commit,
-    config::{self, Account},
-    protocols::megalodon_client::{self, Client},
-    store,
-};
+use crate::{app::commit, protocols::Client, store};
 enum Operation {
     Create(store::CreatingStatus),
     Update {
@@ -44,22 +39,6 @@ impl Operation {
                 .map(|dst| store::Operation::Delete {
                     dst_identifier: dst.identifier.clone(),
                 }),
-        }
-    }
-}
-
-fn client(account: &Account) -> Client {
-    match account {
-        Account::Mastodon {
-            origin,
-            access_token,
-        } => megalodon_client::Client::new_mastodon(origin.clone(), access_token.clone()),
-        Account::AtProtocol {
-            origin: _,
-            identifier: _,
-            password: _,
-        } => {
-            todo!()
         }
     }
 }
@@ -109,17 +88,20 @@ fn create_operations(
     c.chain(ud).collect()
 }
 
-pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result<String> {
-    let mut client = client(&config_user.src);
-    let (user_identifier, statuses) = client.fetch_statuses().await?;
+pub async fn get(
+    store: &mut store::Store,
+    src_client: &mut Box<dyn Client>,
+    dst_clients: &mut [Box<dyn Client>],
+) -> Result<()> {
+    let statuses = src_client.fetch_statuses().await?;
 
-    let stored_user = store.get_or_create_user(config_user.src.origin(), &user_identifier);
+    let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
     if stored_user
         .dsts
         .iter()
         .any(|dst| !dst.operations.is_empty())
     {
-        return Ok(user_identifier);
+        return Ok(());
     }
 
     let src = &mut stored_user.src;
@@ -141,8 +123,8 @@ pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result
         .flatten();
     let necessary_src_identifiers: Vec<_> = src_identifiers.chain(reply_src_identifiers).collect();
 
-    for config_dst in &config_user.dsts {
-        let dst = stored_user.get_or_create_dst(config_dst.origin(), config_dst.identifier());
+    for dst_client in dst_clients {
+        let dst = stored_user.get_or_create_dst(dst_client.origin(), dst_client.identifier());
 
         assert!(dst.operations.is_empty());
         dst.operations = operations
@@ -154,5 +136,5 @@ pub async fn get(config_user: &config::User, store: &mut store::Store) -> Result
             .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
     }
     commit(store).await?;
-    Ok(user_identifier)
+    Ok(())
 }

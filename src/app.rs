@@ -1,10 +1,12 @@
 use ::config::FileFormat;
 use anyhow::{Ok, Result};
+use futures::future::join_all;
 use tokio::fs;
 
 use crate::{
     config::{self, Config},
     destination::post,
+    protocols::create_client,
     source::get,
     store::{self, Store},
 };
@@ -14,15 +16,16 @@ pub async fn commit(store: &Store) -> Result<()> {
 }
 
 async fn execute_per_user(config_user: &config::User, store: &mut store::Store) -> Result<()> {
-    let identifier = get(config_user, store).await?;
+    let mut src_client = create_client(&config_user.src).await?;
 
-    post(
-        config_user.src.origin(),
-        &identifier,
-        &config_user.dsts,
-        store,
-    )
-    .await?;
+    let mut dst_clients = join_all(config_user.dsts.iter().map(create_client))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>>>()?;
+
+    get(store, &mut src_client, &mut dst_clients).await?;
+
+    post(store, src_client.as_ref(), &mut dst_clients).await?;
 
     Ok(())
 }
