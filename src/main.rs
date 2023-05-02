@@ -39,7 +39,7 @@ pub fn init_tracing() {
     tracing_subscriber::registry()
         .with(
             EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::from("mbcp=trace,reqwest=trace")),
+                .unwrap_or_else(|_| EnvFilter::from("timelineecho=trace,reqwest=trace")),
         )
         .with(fmt::layer().with_timer(LocalTime::new(fmt)).compact())
         .init();

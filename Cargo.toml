@@ -1,5 +1,5 @@
 [package]
-name = "mbcp"
+name = "timelineecho"
 version = "0.1.0"
 edition = "2021"
 
