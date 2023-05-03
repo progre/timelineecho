@@ -93,13 +93,6 @@ pub async fn get(
     dst_clients: &[Box<dyn Client>],
 ) -> Result<()> {
     let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
-    if stored_user
-        .dsts
-        .iter()
-        .any(|dst| !dst.operations.is_empty())
-    {
-        return Ok(());
-    }
 
     let src = &mut stored_user.src;
     let (statuses, operations) = fetch_statuses(http_client, src_client, &src.statuses).await?;
@@ -108,8 +101,6 @@ pub async fn get(
 
     for dst_client in dst_clients {
         let dst = stored_user.get_or_create_dst(dst_client.origin(), dst_client.identifier());
-
-        assert!(dst.operations.is_empty());
         dst.operations = create_store_operations(&operations, &dst.statuses);
     }
     commit(store).await?;
