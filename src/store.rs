@@ -58,7 +58,7 @@ pub struct Medium {
     pub alt: String,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct External {
     pub uri: String,

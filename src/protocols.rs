@@ -1,8 +1,11 @@
 mod at_proto;
 pub mod at_proto_client;
 pub mod megalodon_client;
+mod misskey_client;
 mod twitter_api;
 pub mod twitter_client;
+
+use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -46,6 +49,17 @@ pub async fn create_client(account: &config::Account) -> Result<Box<dyn Client>>
             access_token,
         } => Ok(Box::new(
             megalodon_client::Client::new_mastodon(origin.clone(), access_token.clone()).await?,
+        )),
+        config::Account::Misskey {
+            origin,
+            access_token,
+        } => Ok(Box::new(
+            misskey_client::Client::new(
+                Arc::new(reqwest::Client::new()),
+                origin.clone(),
+                access_token.clone(),
+            )
+            .await?,
         )),
         config::Account::Twitter {
             api_key,

@@ -16,6 +16,12 @@ pub enum Account {
         origin: String,
         access_token: String,
     },
+    #[serde(rename = "misskey")]
+    #[serde(rename_all = "camelCase")]
+    Misskey {
+        origin: String,
+        access_token: String,
+    },
     #[serde(rename = "twitter")]
     #[serde(rename_all = "camelCase")]
     Twitter {

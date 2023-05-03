@@ -23,7 +23,13 @@ async fn execute_per_user(config_user: &config::User, store: &mut store::Store) 
         .into_iter()
         .collect::<Result<Vec<_>>>()?;
 
-    get(store, &mut src_client, &mut dst_clients).await?;
+    get(
+        &reqwest::Client::new(),
+        store,
+        &mut src_client,
+        &mut dst_clients,
+    )
+    .await?;
 
     post(store, src_client.as_ref(), &mut dst_clients).await?;
 

@@ -2,8 +2,46 @@ use std::convert::Into;
 
 use anyhow::Result;
 use futures::future::join_all;
+use tracing::warn;
 
 use crate::{app::commit, protocols::Client, store};
+
+async fn fetch_html(http_client: &reqwest::Client, uri: String) -> Result<webpage::HTML> {
+    let text = http_client
+        .get(&uri)
+        .send()
+        .await?
+        .error_for_status()?
+        .text()
+        .await?;
+    Ok(webpage::HTML::from_string(text, Some(uri))?)
+}
+
+async fn create_external(
+    facets: &[store::Facet],
+    http_client: &reqwest::Client,
+) -> Result<Option<store::External>> {
+    for facet in facets {
+        match facet {
+            store::Facet::Link { byte_slice: _, uri } => {
+                let html = match fetch_html(http_client, uri.clone()).await {
+                    Ok(ok) => ok,
+                    Err(err) => {
+                        warn!("extract external from facet failed: {}", err);
+                        continue;
+                    }
+                };
+                return Ok(Some(store::External {
+                    uri: uri.clone(),
+                    title: html.title.unwrap_or_default(),
+                    description: html.description.unwrap_or_default(),
+                    thumb_url: html.opengraph.images.first().map(|g| g.url.clone()),
+                }));
+            }
+        }
+    }
+    Ok(None)
+}
 
 #[derive(Clone)]
 pub enum LiveExternal {
@@ -63,13 +101,14 @@ impl Operation {
     }
 }
 
-async fn into_creating_status(live: LiveStatus) -> Result<store::CreatingStatus> {
+async fn try_into_creating_status(
+    live: LiveStatus,
+    http_client: &reqwest::Client,
+) -> Result<store::CreatingStatus> {
     let external = match live.external {
         LiveExternal::Some(external) => Some(external),
         LiveExternal::None => None,
-        LiveExternal::Unknown => {
-            todo!()
-        }
+        LiveExternal::Unknown => create_external(&live.facets, http_client).await?,
     };
     Ok(store::CreatingStatus {
         src_identifier: live.identifier,
@@ -83,6 +122,7 @@ async fn into_creating_status(live: LiveStatus) -> Result<store::CreatingStatus>
 }
 
 async fn create_operations(
+    http_client: &reqwest::Client,
     live_statuses: &[LiveStatus],
     stored_statuses: &[store::SourceStatus],
 ) -> Result<Vec<Operation>> {
@@ -99,7 +139,7 @@ async fn create_operations(
         .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
         .map(|status| async {
             Ok(Operation::Create(
-                into_creating_status(status.clone()).await?,
+                try_into_creating_status(status.clone(), http_client).await?,
             ))
         });
     let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
@@ -132,6 +172,7 @@ async fn create_operations(
 }
 
 pub async fn get(
+    http_client: &reqwest::Client,
     store: &mut store::Store,
     src_client: &mut Box<dyn Client>,
     dst_clients: &mut [Box<dyn Client>],
@@ -148,7 +189,7 @@ pub async fn get(
     }
 
     let src = &mut stored_user.src;
-    let operations = create_operations(&statuses, &src.statuses).await?;
+    let operations = create_operations(http_client, &statuses, &src.statuses).await?;
     src.statuses = statuses.into_iter().map(Into::into).collect();
 
     let src_identifiers = src.statuses.iter().map(|status| status.identifier.clone());

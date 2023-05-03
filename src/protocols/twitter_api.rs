@@ -10,7 +10,7 @@ use reqwest::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::Value;
-use tracing::{event_enabled, trace, Level};
+use tracing::{error, event_enabled, trace, Level};
 
 fn trace_header(header: &HeaderMap) {
     if !event_enabled!(Level::TRACE) {
@@ -133,15 +133,19 @@ impl Api {
     }
 
     pub async fn destroy_status<T: DeserializeOwned>(&self, id: &str) -> Result<T> {
-        let url = format!("https://api.twitter.com/1.1/statuses/destroy/{}.json", id);
+        let url = format!("https://api.twitter.com/2/tweets/{}", id);
         let resp = self
             .http_client
-            .post(&url)
-            .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
+            .delete(&url)
+            .header(AUTHORIZATION, self.oauth1_request_builder.delete(url, &()))
             .header(ACCEPT, "application/json")
             .send()
-            .await?
-            .error_for_status()?;
+            .await?;
+        let err = resp.error_for_status_ref().err();
+        if let Some(err) = err {
+            error!("{:?}", resp.text().await?);
+            return Err(err.into());
+        }
         trace_header(resp.headers());
         Ok(resp.json().await?)
     }

@@ -7,11 +7,12 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "1.0.70", features = ["backtrace"] }
 async-trait = "0.1.68"
-atrium-api = { git = "https://github.com/sugyan/atrium.git", version = "0.1.0" }
+atrium-api = { git = "https://github.com/sugyan/atrium", version = "0.1.0", rev = "0e9c3cfd4108d4d5778ff2e5f85bedbce1255dee" }
 chrono = "0.4.24"
 config = { version = "0.13.3", default-features = false, features = ["json5"] }
 futures = "0.3.28"
 html2text = "0.5.1"
+linkify = "0.9.0"
 megalodon = "0.7.0"
 oauth1-request = "0.6.0"
 regex = "1.7.3"
@@ -25,3 +26,4 @@ tracing-subscriber = { version = "0.3.17", features = [
   "env-filter",
   "local-time"
 ] }
+webpage = "1.5.0"
