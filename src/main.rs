@@ -11,7 +11,7 @@ mod app;
 mod config;
 mod destination;
 mod protocols;
-mod source;
+mod sources;
 mod store;
 
 use std::num::NonZeroU8;

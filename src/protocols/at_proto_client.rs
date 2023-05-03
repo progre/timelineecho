@@ -6,7 +6,7 @@ use reqwest::header::CONTENT_TYPE;
 use serde_json::{json, Value};
 
 use crate::{
-    source,
+    sources::source,
     store::{self, Facet},
 };
 

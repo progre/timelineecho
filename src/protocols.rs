@@ -10,7 +10,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::{config, source, store};
+use crate::{config, sources::source, store};
 
 #[async_trait(?Send)]
 pub trait Client {

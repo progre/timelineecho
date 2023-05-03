@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use serde_json::{json, Value};
 
-use crate::{source, store};
+use crate::{sources::source, store};
 
 use super::twitter_api::{Api, TweetBody};
 

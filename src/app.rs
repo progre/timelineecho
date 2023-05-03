@@ -7,7 +7,7 @@ use crate::{
     config::{self, Config},
     destination::post,
     protocols::create_client,
-    source::get,
+    sources::source::get,
     store::{self, Store},
 };
 

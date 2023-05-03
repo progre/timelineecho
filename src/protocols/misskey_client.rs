@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use linkify::LinkFinder;
 use serde_json::{json, Value};
 
-use crate::{source, store};
+use crate::{sources::source, store};
 
 fn get_value<'a>(value: &'a Value, key: &str) -> Result<&'a Value> {
     value

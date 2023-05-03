@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 
-use crate::source;
+use crate::sources::source;
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
