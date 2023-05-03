@@ -64,28 +64,6 @@ impl Operation {
     }
 }
 
-fn necessary_src_identifiers(
-    stored_statuses: &[store::SourceStatus],
-    operations: &[Operation],
-) -> Vec<String> {
-    let src_identifiers = stored_statuses
-        .iter()
-        .map(|status| status.identifier.clone());
-    let reply_src_identifiers = operations
-        .iter()
-        .filter_map(|operation| match operation {
-            Operation::Create(create) => Some(create.reply_src_identifier.clone()),
-            Operation::Update {
-                src_identifier: _,
-                content: _,
-                facets: _,
-            }
-            | Operation::Delete { src_identifier: _ } => None,
-        })
-        .flatten();
-    src_identifiers.chain(reply_src_identifiers).collect()
-}
-
 async fn fetch_statuses(
     http_client: &reqwest::Client,
     src_client: &mut dyn Client,
@@ -108,13 +86,6 @@ fn create_store_operations(
         .collect()
 }
 
-fn retain_dst_statuses(stored_user: &mut store::User, necessary_src_identifiers: &[String]) {
-    for dst in &mut stored_user.dsts {
-        dst.statuses
-            .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
-    }
-}
-
 pub async fn get(
     http_client: &reqwest::Client,
     store: &mut store::Store,
@@ -132,7 +103,6 @@ pub async fn get(
 
     let src = &mut stored_user.src;
     let (statuses, operations) = fetch_statuses(http_client, src_client, &src.statuses).await?;
-    let necessary_src_identifiers = necessary_src_identifiers(&statuses, &operations);
 
     src.statuses = statuses;
 
@@ -142,7 +112,6 @@ pub async fn get(
         assert!(dst.operations.is_empty());
         dst.operations = create_store_operations(&operations, &dst.statuses);
     }
-    retain_dst_statuses(stored_user, &necessary_src_identifiers);
     commit(store).await?;
     Ok(())
 }

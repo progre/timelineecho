@@ -27,16 +27,14 @@ pub async fn app() -> Result<()> {
     let mut dst_client_map = HashMap::new();
     for config_user in &config.users {
         let mut src_client = create_client(http_client.clone(), &config_user.src).await?;
-
-        let dst_clients = join_all(
-            config_user
-                .dsts
-                .iter()
-                .map(|dst| create_client(http_client.clone(), dst)),
-        )
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>>>()?;
+        let dst_clients = config_user
+            .dsts
+            .iter()
+            .map(|dst| create_client(http_client.clone(), dst));
+        let dst_clients = join_all(dst_clients)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>>>()?;
 
         get(
             http_client.as_ref(),
@@ -54,6 +52,8 @@ pub async fn app() -> Result<()> {
         }
     }
     post(&mut store, &mut dst_client_map).await?;
+    store.retain_all_dst_statuses();
+    commit(&store).await?;
 
     Ok(())
 }
