@@ -7,14 +7,14 @@ pub mod twitter_client;
 use anyhow::Result;
 use async_trait::async_trait;
 
-use crate::{config, store};
+use crate::{config, source, store};
 
 #[async_trait(?Send)]
 pub trait Client {
     fn origin(&self) -> &str;
     fn identifier(&self) -> &str;
 
-    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>>;
+    async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>>;
 
     async fn post(
         &mut self,

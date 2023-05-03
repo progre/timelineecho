@@ -5,7 +5,7 @@ use megalodon::{megalodon::GetAccountStatusesInputOptions, Megalodon};
 use reqwest::header::HeaderMap;
 use tracing::{event_enabled, trace, Level};
 
-use crate::store;
+use crate::{source, store};
 
 fn trace_header(header: &HeaderMap) {
     if !event_enabled!(Level::TRACE) {
@@ -96,7 +96,7 @@ impl super::Client for Client {
         &self.account_id
     }
 
-    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>> {
+    async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         let resp = self
             .megalodon
             .get_account_statuses(
@@ -114,8 +114,8 @@ impl super::Client for Client {
             .into_iter()
             .map(|status| {
                 let (content, facets) = html_to_content_facets(&status.content);
-                store::CreatingStatus {
-                    src_identifier: status.id,
+                source::LiveStatus {
+                    identifier: status.id,
                     content,
                     facets,
                     reply_src_identifier: status.in_reply_to_id,
@@ -127,12 +127,17 @@ impl super::Client for Client {
                             alt: media.description.unwrap_or_default(),
                         })
                         .collect(),
-                    external: status.card.map(|card| store::External {
-                        uri: card.url,
-                        title: card.title,
-                        description: card.description,
-                        thumb_url: card.image.unwrap_or_default(),
-                    }),
+                    external: status.card.map_or_else(
+                        || source::LiveExternal::None,
+                        |card| {
+                            source::LiveExternal::Some(store::External {
+                                uri: card.url,
+                                title: card.title,
+                                description: card.description,
+                                thumb_url: card.image,
+                            })
+                        },
+                    ),
                     created_at: status.created_at.to_rfc3339(),
                 }
             })

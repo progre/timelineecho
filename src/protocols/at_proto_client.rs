@@ -5,7 +5,10 @@ use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
 use serde_json::{json, Value};
 
-use crate::store::{self, Facet};
+use crate::{
+    source,
+    store::{self, Facet},
+};
 
 use super::at_proto::{
     repo::{Embed, External, Image, Record},
@@ -24,19 +27,22 @@ fn to_record<'a>(
         facets: facets
             .iter()
             .map(|facet| match facet {
-                Facet::Mention {
-                    byte_slice,
-                    identifier,
-                } => json!({
-                    "index": {
-                        "byteStart": byte_slice.start,
-                        "byteEnd": byte_slice.end
-                    },
-                    "features": [{
-                        "$type": "app.bsky.richtext.facet#mention",
-                        "did": identifier,
-                    }]
-                }),
+                // NOTE: 実装予定なし
+                // Facet::Mention {
+                //     byte_slice,
+                //     src_identifier,
+                // } => {
+                //     json!({
+                //         "index": {
+                //             "byteStart": byte_slice.start,
+                //             "byteEnd": byte_slice.end
+                //         },
+                //         "features": [{
+                //             "$type": "app.bsky.richtext.facet#mention",
+                //             "did": "TODO",
+                //         }]
+                //     })
+                // }
                 Facet::Link { byte_slice, uri } => json!({
                     "index": {
                         "byteStart": byte_slice.start,
@@ -87,6 +93,67 @@ impl Client {
             password,
         }
     }
+
+    async fn to_embed(
+        &self,
+        session: &Session,
+        images: Vec<store::Medium>,
+        external: Option<store::External>,
+    ) -> Result<Option<Embed>> {
+        if !images.is_empty() {
+            let mut array = Vec::new();
+            for image in images {
+                let resp = self.http_client.get(&image.url).send().await?;
+                let content_type = resp
+                    .headers()
+                    .get(CONTENT_TYPE)
+                    .ok_or_else(|| anyhow!("no content-type"))?
+                    .to_str()?
+                    .to_owned();
+
+                let mut res = self
+                    .api
+                    .repo
+                    .upload_blob(&self.http_client, session, content_type, resp)
+                    .await?;
+                let alt = image.alt;
+                let image = res
+                    .get_mut("blob")
+                    .ok_or_else(|| anyhow!("blob not found"))?
+                    .take();
+                array.push(Image { image, alt });
+            }
+            return Ok(Some(Embed::Images(array)));
+        }
+        if let Some(external) = external {
+            if let Some(thumb_url) = &external.thumb_url {
+                let resp = self.http_client.get(thumb_url).send().await?;
+                let content_type = resp
+                    .headers()
+                    .get(CONTENT_TYPE)
+                    .ok_or_else(|| anyhow!("no content-type"))?
+                    .to_str()?
+                    .to_owned();
+
+                let mut res = self
+                    .api
+                    .repo
+                    .upload_blob(&self.http_client, session, content_type, resp)
+                    .await?;
+                let thumb = res
+                    .get_mut("blob")
+                    .ok_or_else(|| anyhow!("blob not found"))?
+                    .take();
+                return Ok(Some(Embed::External(External {
+                    uri: external.uri,
+                    title: external.title,
+                    description: external.description,
+                    thumb,
+                })));
+            }
+        }
+        Ok(None)
+    }
 }
 
 #[async_trait(?Send)]
@@ -99,7 +166,7 @@ impl super::Client for Client {
         &self.identifier
     }
 
-    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>> {
+    async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         todo!()
     }
 
@@ -132,59 +199,7 @@ impl super::Client for Client {
                 Ok(ReplyRef { parent, root })
             })
             .transpose()?;
-        let embed = if !images.is_empty() {
-            let mut array = Vec::new();
-            for image in images {
-                let resp = self.http_client.get(&image.url).send().await?;
-                let content_type = resp
-                    .headers()
-                    .get(CONTENT_TYPE)
-                    .ok_or_else(|| anyhow!("no content-type"))?
-                    .to_str()?
-                    .to_owned();
-
-                let mut res = self
-                    .api
-                    .repo
-                    .upload_blob(&self.http_client, session, content_type, resp)
-                    .await?;
-                let alt = image.alt;
-                let image = res
-                    .get_mut("blob")
-                    .ok_or_else(|| anyhow!("blob not found"))?
-                    .take();
-                array.push(Image { image, alt });
-            }
-            Some(Embed::Images(array))
-        } else if let Some(external) = external {
-            let resp = self.http_client.get(&external.thumb_url).send().await?;
-            let content_type = resp
-                .headers()
-                .get(CONTENT_TYPE)
-                .ok_or_else(|| anyhow!("no content-type"))?
-                .to_str()?
-                .to_owned();
-
-            let mut res = self
-                .api
-                .repo
-                .upload_blob(&self.http_client, session, content_type, resp)
-                .await?;
-            let thumb = res
-                .get_mut("blob")
-                .ok_or_else(|| anyhow!("blob not found"))?
-                .take();
-
-            Some(Embed::External(External {
-                uri: external.uri,
-                title: external.title,
-                description: external.description,
-                thumb,
-            }))
-        } else {
-            None
-        };
-
+        let embed = self.to_embed(session, images, external).await?;
         let record = to_record(content, facets, reply, embed.as_ref(), created_at);
 
         let output = self

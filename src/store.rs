@@ -2,6 +2,8 @@ use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 
+use crate::source;
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceStatus {
@@ -18,6 +20,15 @@ impl From<CreatingStatus> for SourceStatus {
     }
 }
 
+impl From<source::LiveStatus> for SourceStatus {
+    fn from(full: source::LiveStatus) -> Self {
+        SourceStatus {
+            identifier: full.identifier,
+            content: full.content,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Source {
@@ -26,15 +37,16 @@ pub struct Source {
     pub statuses: Vec<SourceStatus>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum Facet {
-    #[serde(rename_all = "camelCase")]
-    Mention {
-        byte_slice: Range<u32>,
-        identifier: String,
-    },
+    // NOTE: 実装予定なし
+    // #[serde(rename_all = "camelCase")]
+    // Mention {
+    //     byte_slice: Range<u32>,
+    //     src_identifier: String,
+    // },
     #[serde(rename_all = "camelCase")]
     Link { byte_slice: Range<u32>, uri: String },
 }
@@ -52,7 +64,7 @@ pub struct External {
     pub uri: String,
     pub title: String,
     pub description: String,
-    pub thumb_url: String,
+    pub thumb_url: Option<String>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

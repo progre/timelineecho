@@ -15,7 +15,7 @@ pub struct External {
     pub uri: String,
     pub title: String,
     pub description: String,
-    pub thumb: Value,
+    pub thumb: Value, // WTF: ドキュメントだと optional だが実装では必須になっている https://github.com/bluesky-social/atproto/blob/7f008c0/lexicons/app/bsky/embed/external.json#L18
 }
 
 #[derive(Clone, Serialize)]

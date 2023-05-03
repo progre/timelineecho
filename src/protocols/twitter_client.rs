@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use futures::future::join_all;
 use serde_json::{json, Value};
 
-use crate::store;
+use crate::{source, store};
 
 use super::twitter_api::{Api, TweetBody};
 
@@ -58,7 +58,7 @@ impl super::Client for Client {
         &self.user_id
     }
 
-    async fn fetch_statuses(&mut self) -> Result<Vec<store::CreatingStatus>> {
+    async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         todo!()
     }
 

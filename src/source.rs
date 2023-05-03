@@ -1,8 +1,28 @@
 use std::convert::Into;
 
 use anyhow::Result;
+use futures::future::join_all;
 
 use crate::{app::commit, protocols::Client, store};
+
+#[derive(Clone)]
+pub enum LiveExternal {
+    Some(store::External),
+    None,
+    Unknown,
+}
+
+#[derive(Clone)]
+pub struct LiveStatus {
+    pub identifier: String,
+    pub content: String,
+    pub facets: Vec<store::Facet>,
+    pub reply_src_identifier: Option<String>,
+    pub media: Vec<store::Medium>,
+    pub external: LiveExternal,
+    pub created_at: String,
+}
+
 enum Operation {
     Create(store::CreatingStatus),
     Update {
@@ -43,12 +63,31 @@ impl Operation {
     }
 }
 
-fn create_operations(
-    live_statuses: &[store::CreatingStatus],
+async fn into_creating_status(live: LiveStatus) -> Result<store::CreatingStatus> {
+    let external = match live.external {
+        LiveExternal::Some(external) => Some(external),
+        LiveExternal::None => None,
+        LiveExternal::Unknown => {
+            todo!()
+        }
+    };
+    Ok(store::CreatingStatus {
+        src_identifier: live.identifier,
+        content: live.content,
+        facets: live.facets,
+        reply_src_identifier: live.reply_src_identifier,
+        media: live.media,
+        external,
+        created_at: live.created_at,
+    })
+}
+
+async fn create_operations(
+    live_statuses: &[LiveStatus],
     stored_statuses: &[store::SourceStatus],
-) -> Vec<Operation> {
+) -> Result<Vec<Operation>> {
     if live_statuses.is_empty() || stored_statuses.is_empty() {
-        return vec![];
+        return Ok(vec![]);
     }
     // C
     let last_id = stored_statuses
@@ -57,27 +96,31 @@ fn create_operations(
         .map(|x| &x.identifier);
     let c = live_statuses
         .iter()
-        .filter(|live| last_id.map_or(true, |last_id| &live.src_identifier > last_id))
-        .map(|status| Operation::Create(status.clone()));
-
+        .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
+        .map(|status| async {
+            Ok(Operation::Create(
+                into_creating_status(status.clone()).await?,
+            ))
+        });
+    let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
     // UD
     let since_id = &live_statuses
         .iter()
-        .min_by_key(|status| &status.src_identifier)
+        .min_by_key(|status| &status.identifier)
         .unwrap()
-        .src_identifier;
+        .identifier;
     let ud = stored_statuses
         .iter()
         .filter(|stored| &stored.identifier >= since_id)
         .filter_map(|stored| {
-            let Some(live) = live_statuses.iter().find(|live| live.src_identifier == stored.identifier) else {
+            let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
                 return Some(Operation::Delete {
                     src_identifier: stored.identifier.clone(),
                 });
             };
             if live.content != stored.content {
                 return Some(Operation::Update {
-                    src_identifier: live.src_identifier.clone(),
+                    src_identifier: live.identifier.clone(),
                     content: live.content.clone(),
                     facets: live.facets.clone(),
                 });
@@ -85,7 +128,7 @@ fn create_operations(
             None
         });
 
-    c.chain(ud).collect()
+    Ok(c.into_iter().chain(ud).collect())
 }
 
 pub async fn get(
@@ -105,7 +148,7 @@ pub async fn get(
     }
 
     let src = &mut stored_user.src;
-    let operations = create_operations(&statuses, &src.statuses);
+    let operations = create_operations(&statuses, &src.statuses).await?;
     src.statuses = statuses.into_iter().map(Into::into).collect();
 
     let src_identifiers = src.statuses.iter().map(|status| status.identifier.clone());
