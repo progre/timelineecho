@@ -19,12 +19,12 @@ pub struct Client {
 
 impl Client {
     pub async fn new(
+        http_client: Arc<reqwest::Client>,
         api_key: String,
         api_key_secret: String,
         access_token: String,
         access_token_secret: String,
     ) -> Result<Self> {
-        let http_client = Arc::new(reqwest::Client::new());
         let api = Api::new(
             http_client.clone(),
             api_key,

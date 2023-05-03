@@ -32,7 +32,10 @@ pub trait Client {
     async fn delete(&mut self, identifier: &str) -> Result<()>;
 }
 
-pub async fn create_client(account: &config::Account) -> Result<Box<dyn Client>> {
+pub async fn create_client(
+    http_client: Arc<reqwest::Client>,
+    account: &config::Account,
+) -> Result<Box<dyn Client>> {
     match account {
         config::Account::AtProtocol {
             origin,
@@ -40,7 +43,7 @@ pub async fn create_client(account: &config::Account) -> Result<Box<dyn Client>>
             password,
         } => Ok(Box::new(at_proto_client::Client::new(
             origin.into(),
-            reqwest::Client::new(),
+            http_client,
             identifier.into(),
             password.into(),
         ))),
@@ -54,12 +57,7 @@ pub async fn create_client(account: &config::Account) -> Result<Box<dyn Client>>
             origin,
             access_token,
         } => Ok(Box::new(
-            misskey_client::Client::new(
-                Arc::new(reqwest::Client::new()),
-                origin.clone(),
-                access_token.clone(),
-            )
-            .await?,
+            misskey_client::Client::new(http_client, origin.clone(), access_token.clone()).await?,
         )),
         config::Account::Twitter {
             api_key,
@@ -68,6 +66,7 @@ pub async fn create_client(account: &config::Account) -> Result<Box<dyn Client>>
             access_token_secret,
         } => Ok(Box::new(
             twitter_client::Client::new(
+                http_client,
                 api_key.clone(),
                 api_key_secret.clone(),
                 access_token.clone(),

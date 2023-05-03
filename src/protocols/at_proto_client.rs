@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use atrium_api::{app::bsky::feed::post::ReplyRef, com::atproto::repo::strong_ref};
@@ -72,7 +74,7 @@ fn to_record<'a>(
 
 pub struct Client {
     api: Api,
-    http_client: reqwest::Client,
+    http_client: Arc<reqwest::Client>,
     session: Option<Session>,
     pub identifier: String,
     password: String,
@@ -81,7 +83,7 @@ pub struct Client {
 impl Client {
     pub fn new(
         origin: String,
-        http_client: reqwest::Client,
+        http_client: Arc<reqwest::Client>,
         identifier: String,
         password: String,
     ) -> Self {
