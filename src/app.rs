@@ -6,14 +6,10 @@ use futures::future::join_all;
 use tokio::fs;
 
 use crate::{
-    config::{self, Config},
-    destination::post,
-    protocols::create_client,
-    sources::source::get,
-    store::{self, Store},
+    config::Config, destination::post, protocols::create_client, sources::source::get, store,
 };
 
-pub async fn commit(store: &Store) -> Result<()> {
+pub async fn commit(store: &store::Store) -> Result<()> {
     Ok(fs::write("store.json", serde_json::to_string_pretty(store)?).await?)
 }
 
@@ -23,15 +19,16 @@ pub async fn app() -> Result<()> {
         .build()?
         .try_deserialize()?;
 
-    let mut store: Store =
+    let mut store: store::Store =
         serde_json::from_str(&fs::read_to_string("store.json").await.unwrap_or_default())
             .unwrap_or_default();
 
     let http_client = Arc::new(reqwest::Client::new());
+    let mut dst_client_map = HashMap::new();
     for config_user in &config.users {
         let mut src_client = create_client(http_client.clone(), &config_user.src).await?;
 
-        let mut dst_clients = join_all(
+        let dst_clients = join_all(
             config_user
                 .dsts
                 .iter()
@@ -49,8 +46,14 @@ pub async fn app() -> Result<()> {
         )
         .await?;
 
-        post(&mut store, src_client.as_ref(), &mut dst_clients).await?;
+        for dst_client in dst_clients {
+            dst_client_map.insert(
+                store::AccountPair::from_clients(src_client.as_ref(), dst_client.as_ref()),
+                dst_client,
+            );
+        }
     }
+    post(&mut store, &mut dst_client_map).await?;
 
     Ok(())
 }

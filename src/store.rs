@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 
-use crate::sources::source;
+use crate::{protocols::Client, sources::source};
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -147,6 +147,26 @@ impl User {
     }
 }
 
+#[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountPair {
+    pub src_origin: String,
+    pub src_account_identifier: String,
+    pub dst_origin: String,
+    pub dst_account_identifier: String,
+}
+
+impl AccountPair {
+    pub fn from_clients(src_client: &dyn Client, dst_client: &dyn Client) -> Self {
+        Self {
+            src_origin: src_client.origin().to_owned(),
+            src_account_identifier: src_client.identifier().to_owned(),
+            dst_origin: dst_client.origin().to_owned(),
+            dst_account_identifier: dst_client.identifier().to_owned(),
+        }
+    }
+}
+
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Store {
@@ -171,5 +191,16 @@ impl Store {
             dsts: Vec::default(),
         });
         self.users.last_mut().unwrap()
+    }
+
+    pub fn get_or_create_dst<'a>(&'a mut self, account_pair: &AccountPair) -> &'a mut Destination {
+        self.get_or_create_user(
+            &account_pair.src_origin,
+            &account_pair.src_account_identifier,
+        )
+        .get_or_create_dst(
+            &account_pair.dst_origin,
+            &account_pair.dst_account_identifier,
+        )
     }
 }

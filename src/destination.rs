@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 
 use crate::{
@@ -71,22 +73,38 @@ pub async fn post_operation(
     Ok(())
 }
 
+fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store::Operation)> {
+    let user = store
+        .users
+        .iter_mut()
+        .find(|user| user.dsts.iter().any(|dst| !dst.operations.is_empty()))?;
+    let dst = user
+        .dsts
+        .iter_mut()
+        .find(|dst| !dst.operations.is_empty())?;
+    let account_pair = store::AccountPair {
+        src_origin: user.src.origin.clone(),
+        src_account_identifier: user.src.identifier.clone(),
+        dst_origin: dst.origin.clone(),
+        dst_account_identifier: dst.identifier.clone(),
+    };
+    Some((account_pair, dst.operations.pop().unwrap()))
+}
+
 pub async fn post(
     store: &mut store::Store,
-    src_client: &dyn Client,
-    dst_clients: &mut [Box<dyn Client>],
+    dst_client_map: &mut HashMap<store::AccountPair, Box<dyn Client>>,
 ) -> Result<()> {
-    for dst_client in dst_clients {
-        loop {
-            let stored_dst = store
-                .get_or_create_user(src_client.origin(), src_client.identifier())
-                .get_or_create_dst(dst_client.origin(), dst_client.identifier());
-            let Some(operation) = stored_dst.operations.pop() else {
-                break;
-            };
-            post_operation(stored_dst, dst_client.as_mut(), operation).await?;
-            commit(store).await?;
-        }
+    loop {
+        let Some((account_pair, operation)) = pop_operation(store) else {
+            break;
+        };
+
+        let stored_dst = store.get_or_create_dst(&account_pair);
+        let dst_client = dst_client_map.get_mut(&account_pair).unwrap();
+
+        post_operation(stored_dst, dst_client.as_mut(), operation).await?;
+        commit(store).await?;
     }
 
     Ok(())
