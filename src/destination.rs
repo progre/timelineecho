@@ -31,41 +31,41 @@ pub async fn post_operation(
 ) -> Result<()> {
     match operation {
         Create(store::CreatingStatus {
-            src_identifier,
-            content,
-            facets,
-            reply_src_identifier,
-            media,
-            external,
-            created_at,
+            account_pair: _,
+            source_status,
         }) => {
             let dst_statuses = &mut stored_dst.statuses;
-            let reply_identifier = reply_src_identifier
+            let reply_identifier = source_status
+                .reply_src_identifier
                 .and_then(|reply| to_dst_identifier(&reply, dst_statuses.as_ref()));
-            let dst_identifier = dst_client
+            let identifier = dst_client
                 .post(
-                    &content,
-                    &facets,
+                    &source_status.content,
+                    &source_status.facets,
                     reply_identifier,
-                    media,
-                    external,
-                    &created_at,
+                    source_status.media,
+                    source_status.external,
+                    &source_status.created_at,
                 )
                 .await?;
             dst_statuses.insert(
                 0,
                 store::DestinationStatus {
-                    identifier: dst_identifier,
-                    src_identifier,
+                    identifier,
+                    src_identifier: source_status.src_identifier,
                 },
             );
         }
         Update {
+            account_pair: _,
             dst_identifier: _,
             content: _,
             facets: _,
         } => todo!(),
-        Delete { dst_identifier } => {
+        Delete {
+            account_pair: _,
+            dst_identifier,
+        } => {
             dst_client.delete(&dst_identifier).await?;
         }
     }
@@ -73,35 +73,18 @@ pub async fn post_operation(
     Ok(())
 }
 
-fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store::Operation)> {
-    let user = store
-        .users
-        .iter_mut()
-        .find(|user| user.dsts.iter().any(|dst| !dst.operations.is_empty()))?;
-    let dst = user
-        .dsts
-        .iter_mut()
-        .find(|dst| !dst.operations.is_empty())?;
-    let account_pair = store::AccountPair {
-        src_origin: user.src.origin.clone(),
-        src_account_identifier: user.src.identifier.clone(),
-        dst_origin: dst.origin.clone(),
-        dst_account_identifier: dst.identifier.clone(),
-    };
-    Some((account_pair, dst.operations.pop().unwrap()))
-}
-
 pub async fn post(
     store: &mut store::Store,
     dst_client_map: &mut HashMap<store::AccountPair, Box<dyn Client>>,
 ) -> Result<()> {
     loop {
-        let Some((account_pair, operation)) = pop_operation(store) else {
+        let Some(operation) = store.operations.pop() else {
             break;
         };
 
-        let stored_dst = store.get_or_create_dst(&account_pair);
-        let dst_client = dst_client_map.get_mut(&account_pair).unwrap();
+        let account_pair = operation.account_pair();
+        let stored_dst = store.get_or_create_dst(account_pair);
+        let dst_client = dst_client_map.get_mut(account_pair).unwrap();
 
         post_operation(stored_dst, dst_client.as_mut(), operation).await?;
         commit(store).await?;

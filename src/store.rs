@@ -14,8 +14,8 @@ pub struct SourceStatus {
 impl From<CreatingStatus> for SourceStatus {
     fn from(full: CreatingStatus) -> Self {
         SourceStatus {
-            identifier: full.src_identifier,
-            content: full.content,
+            identifier: full.source_status.src_identifier,
+            content: full.source_status.content,
         }
     }
 }
@@ -67,40 +67,6 @@ pub struct External {
     pub thumb_url: Option<String>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreatingStatus {
-    pub src_identifier: String,
-    pub content: String,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
-    pub facets: Vec<Facet>,
-    pub reply_src_identifier: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    #[serde(default)]
-    pub media: Vec<Medium>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub external: Option<External>,
-    pub created_at: String,
-}
-
-#[derive(Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[serde(tag = "operation")]
-pub enum Operation {
-    #[serde(rename_all = "camelCase")]
-    Create(CreatingStatus),
-    #[serde(rename_all = "camelCase")]
-    Update {
-        dst_identifier: String,
-        content: String,
-        #[serde(skip_serializing_if = "Vec::is_empty")]
-        facets: Vec<Facet>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Delete { dst_identifier: String },
-}
-
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DestinationStatus {
@@ -114,7 +80,6 @@ pub struct Destination {
     pub origin: String,
     pub identifier: String,
     pub statuses: Vec<DestinationStatus>,
-    pub operations: Vec<Operation>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -125,6 +90,12 @@ pub struct User {
 }
 
 impl User {
+    pub fn find_dst<'a>(&'a self, origin: &str, identifier: &str) -> Option<&'a Destination> {
+        self.dsts
+            .iter()
+            .find(|dst| dst.origin == origin && dst.identifier == identifier)
+    }
+
     pub fn get_or_create_dst<'a>(
         &'a mut self,
         origin: &str,
@@ -141,7 +112,6 @@ impl User {
             origin: origin.to_owned(),
             identifier: identifier.to_owned(),
             statuses: Vec::default(),
-            operations: Vec::default(),
         });
         self.dsts.last_mut().unwrap()
     }
@@ -167,10 +137,81 @@ impl AccountPair {
     }
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceStatusFull {
+    pub src_identifier: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub facets: Vec<Facet>,
+    pub reply_src_identifier: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub media: Vec<Medium>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub external: Option<External>,
+    pub created_at: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatingStatus {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    #[serde(flatten)]
+    pub source_status: SourceStatusFull,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "operation")]
+pub enum Operation {
+    #[serde(rename_all = "camelCase")]
+    Create(CreatingStatus),
+    #[serde(rename_all = "camelCase")]
+    Update {
+        #[serde(flatten)]
+        account_pair: AccountPair,
+        dst_identifier: String,
+        content: String,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        facets: Vec<Facet>,
+    },
+    #[serde(rename_all = "camelCase")]
+    Delete {
+        #[serde(flatten)]
+        account_pair: AccountPair,
+        dst_identifier: String,
+    },
+}
+
+impl Operation {
+    pub fn account_pair(&self) -> &AccountPair {
+        match self {
+            Operation::Create(CreatingStatus {
+                account_pair,
+                source_status: _,
+            })
+            | Operation::Update {
+                account_pair,
+                dst_identifier: _,
+                content: _,
+                facets: _,
+            }
+            | Operation::Delete {
+                account_pair,
+                dst_identifier: _,
+            } => account_pair,
+        }
+    }
+}
+
 #[derive(Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Store {
     pub users: Vec<User>,
+    pub operations: Vec<Operation>,
 }
 
 impl Store {

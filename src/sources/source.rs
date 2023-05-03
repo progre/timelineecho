@@ -25,7 +25,7 @@ pub struct LiveStatus {
 }
 
 pub enum Operation {
-    Create(store::CreatingStatus),
+    Create(store::SourceStatusFull),
     Update {
         src_identifier: String,
         content: String,
@@ -37,10 +37,17 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn to_store(&self, dst_statuses: &[store::DestinationStatus]) -> Option<store::Operation> {
+    pub fn to_store(
+        &self,
+        account_pair: &store::AccountPair,
+        dst_statuses: &[store::DestinationStatus],
+    ) -> Option<store::Operation> {
         match self {
             Operation::Create(source_status_full) => {
-                Some(store::Operation::Create(source_status_full.clone()))
+                Some(store::Operation::Create(store::CreatingStatus {
+                    account_pair: account_pair.clone(),
+                    source_status: source_status_full.clone(),
+                }))
             }
             Operation::Update {
                 src_identifier,
@@ -50,6 +57,7 @@ impl Operation {
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| store::Operation::Update {
+                    account_pair: account_pair.clone(),
                     dst_identifier: dst.identifier.clone(),
                     content: content.clone(),
                     facets: facets.clone(),
@@ -58,6 +66,7 @@ impl Operation {
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| store::Operation::Delete {
+                    account_pair: account_pair.clone(),
                     dst_identifier: dst.identifier.clone(),
                 }),
         }
@@ -78,10 +87,37 @@ pub async fn fetch_statuses(
 
 pub fn create_store_operations(
     operations: &[Operation],
-    dst_statuses: &[store::DestinationStatus],
+    dsts: &[(store::AccountPair, Option<&[store::DestinationStatus]>)],
 ) -> Vec<store::Operation> {
     operations
         .iter()
-        .filter_map(|operation| operation.to_store(dst_statuses))
+        .flat_map(|operation| {
+            dsts.iter()
+                .filter_map(|(account_pair, statuses)| {
+                    const EMPTY: [store::DestinationStatus; 0] = [];
+                    operation.to_store(account_pair, statuses.unwrap_or(&EMPTY))
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+pub fn to_dst_statuses<'a>(
+    dst_clients: &'a [Box<dyn Client>],
+    stored_user: &'a store::User,
+    src_client: &dyn Client,
+) -> Vec<(store::AccountPair, Option<&'a [store::DestinationStatus]>)> {
+    dst_clients
+        .iter()
+        .map(|dst_client| {
+            let account_pair = store::AccountPair::from_clients(src_client, dst_client.as_ref());
+            let dst_statuses = stored_user
+                .find_dst(
+                    &account_pair.dst_origin,
+                    &account_pair.dst_account_identifier,
+                )
+                .map(|dst| &dst.statuses as &[store::DestinationStatus]);
+            (account_pair, dst_statuses)
+        })
         .collect()
 }

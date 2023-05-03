@@ -8,7 +8,7 @@ use crate::{
     config::Config,
     destination::post,
     protocols::{create_client, create_clients},
-    sources::source::{create_store_operations, fetch_statuses},
+    sources::source::{create_store_operations, fetch_statuses, to_dst_statuses},
     store,
 };
 
@@ -28,6 +28,7 @@ pub async fn app() -> Result<()> {
 
     let http_client = Arc::new(reqwest::Client::new());
     let mut dst_client_map = HashMap::new();
+    let mut all_operations = Vec::new();
     for config_user in &config.users {
         let mut src_client = create_client(http_client.clone(), &config_user.src).await?;
 
@@ -38,24 +39,26 @@ pub async fn app() -> Result<()> {
             fetch_statuses(http_client.as_ref(), src_client.as_mut(), &src.statuses).await?;
         src.statuses = statuses;
 
-        if !operations.is_empty() {
-            create_clients(&http_client, &config_user.dsts)
-                .await?
-                .into_iter()
-                .for_each(|dst_client| {
-                    let dst =
-                        stored_user.get_or_create_dst(dst_client.origin(), dst_client.identifier());
-                    dst.operations = create_store_operations(&operations, &dst.statuses);
+        let mut new_operations = if operations.is_empty() {
+            vec![]
+        } else {
+            let dst_clients = create_clients(&http_client, &config_user.dsts).await?;
+            let dsts = to_dst_statuses(dst_clients.as_ref(), &*stored_user, &*src_client);
+            let new_operations = create_store_operations(&operations, &dsts);
+            for dst_client in dst_clients {
+                dst_client_map.insert(
+                    store::AccountPair::from_clients(src_client.as_ref(), dst_client.as_ref()),
+                    dst_client,
+                );
+            }
+            new_operations
+        };
 
-                    dst_client_map.insert(
-                        store::AccountPair::from_clients(src_client.as_ref(), dst_client.as_ref()),
-                        dst_client,
-                    );
-                });
-        }
-
-        commit(&store).await?;
+        all_operations.append(&mut new_operations);
     }
+    store.operations = all_operations;
+
+    commit(&store).await?;
     post(&mut store, &mut dst_client_map).await?;
     store.retain_all_dst_statuses();
     commit(&store).await?;

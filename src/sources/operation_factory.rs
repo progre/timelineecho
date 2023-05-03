@@ -43,16 +43,16 @@ async fn create_external(
     Ok(None)
 }
 
-async fn try_into_creating_status(
+async fn try_into_source_status(
     live: LiveStatus,
     http_client: &reqwest::Client,
-) -> Result<store::CreatingStatus> {
+) -> Result<store::SourceStatusFull> {
     let external = match live.external {
         LiveExternal::Some(external) => Some(external),
         LiveExternal::None => None,
         LiveExternal::Unknown => create_external(&live.facets, http_client).await?,
     };
-    Ok(store::CreatingStatus {
+    Ok(store::SourceStatusFull {
         src_identifier: live.identifier,
         content: live.content,
         facets: live.facets,
@@ -81,7 +81,7 @@ pub async fn create_operations(
         .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
         .map(|status| async {
             Ok(Operation::Create(
-                try_into_creating_status(status.clone(), http_client).await?,
+                try_into_source_status(status.clone(), http_client).await?,
             ))
         });
     let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
