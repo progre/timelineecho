@@ -64,28 +64,13 @@ impl Operation {
     }
 }
 
-pub async fn get(
-    http_client: &reqwest::Client,
-    store: &mut store::Store,
-    src_client: &mut Box<dyn Client>,
-    dst_clients: &mut [Box<dyn Client>],
-) -> Result<()> {
-    let statuses = src_client.fetch_statuses().await?;
-
-    let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
-    if stored_user
-        .dsts
+fn necessary_src_identifiers(
+    stored_statuses: &[store::SourceStatus],
+    operations: &[Operation],
+) -> Vec<String> {
+    let src_identifiers = stored_statuses
         .iter()
-        .any(|dst| !dst.operations.is_empty())
-    {
-        return Ok(());
-    }
-
-    let src = &mut stored_user.src;
-    let operations = create_operations(http_client, &statuses, &src.statuses).await?;
-    src.statuses = statuses.into_iter().map(Into::into).collect();
-
-    let src_identifiers = src.statuses.iter().map(|status| status.identifier.clone());
+        .map(|status| status.identifier.clone());
     let reply_src_identifiers = operations
         .iter()
         .filter_map(|operation| match operation {
@@ -98,7 +83,32 @@ pub async fn get(
             | Operation::Delete { src_identifier: _ } => None,
         })
         .flatten();
-    let necessary_src_identifiers: Vec<_> = src_identifiers.chain(reply_src_identifiers).collect();
+    src_identifiers.chain(reply_src_identifiers).collect()
+}
+
+pub async fn get(
+    http_client: &reqwest::Client,
+    store: &mut store::Store,
+    src_client: &mut dyn Client,
+    dst_clients: &[Box<dyn Client>],
+) -> Result<()> {
+    let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
+    if stored_user
+        .dsts
+        .iter()
+        .any(|dst| !dst.operations.is_empty())
+    {
+        return Ok(());
+    }
+
+    let live_statuses = src_client.fetch_statuses().await?;
+
+    let src = &mut stored_user.src;
+    let operations = create_operations(http_client, &live_statuses, &src.statuses).await?;
+    let statuses: Vec<_> = live_statuses.into_iter().map(Into::into).collect();
+    let necessary_src_identifiers = necessary_src_identifiers(&statuses, &operations);
+
+    src.statuses = statuses;
 
     for dst_client in dst_clients {
         let dst = stored_user.get_or_create_dst(dst_client.origin(), dst_client.identifier());

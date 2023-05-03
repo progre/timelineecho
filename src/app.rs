@@ -34,8 +34,8 @@ async fn execute_per_user(config_user: &config::User, store: &mut store::Store) 
     get(
         http_client.as_ref(),
         store,
-        &mut src_client,
-        &mut dst_clients,
+        src_client.as_mut(),
+        &dst_clients,
     )
     .await?;
 
