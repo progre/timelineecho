@@ -86,6 +86,35 @@ fn necessary_src_identifiers(
     src_identifiers.chain(reply_src_identifiers).collect()
 }
 
+async fn fetch_statuses(
+    http_client: &reqwest::Client,
+    src_client: &mut dyn Client,
+    src_statuses: &[store::SourceStatus],
+) -> Result<(Vec<store::SourceStatus>, Vec<Operation>)> {
+    let live_statuses = src_client.fetch_statuses().await?;
+
+    let operations = create_operations(http_client, &live_statuses, src_statuses).await?;
+    let statuses: Vec<_> = live_statuses.into_iter().map(Into::into).collect();
+    Ok((statuses, operations))
+}
+
+fn create_store_operations(
+    operations: &[Operation],
+    dst_statuses: &[store::DestinationStatus],
+) -> Vec<store::Operation> {
+    operations
+        .iter()
+        .filter_map(|operation| operation.to_store(dst_statuses))
+        .collect()
+}
+
+fn retain_dst_statuses(stored_user: &mut store::User, necessary_src_identifiers: &[String]) {
+    for dst in &mut stored_user.dsts {
+        dst.statuses
+            .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
+    }
+}
+
 pub async fn get(
     http_client: &reqwest::Client,
     store: &mut store::Store,
@@ -101,11 +130,8 @@ pub async fn get(
         return Ok(());
     }
 
-    let live_statuses = src_client.fetch_statuses().await?;
-
     let src = &mut stored_user.src;
-    let operations = create_operations(http_client, &live_statuses, &src.statuses).await?;
-    let statuses: Vec<_> = live_statuses.into_iter().map(Into::into).collect();
+    let (statuses, operations) = fetch_statuses(http_client, src_client, &src.statuses).await?;
     let necessary_src_identifiers = necessary_src_identifiers(&statuses, &operations);
 
     src.statuses = statuses;
@@ -114,14 +140,9 @@ pub async fn get(
         let dst = stored_user.get_or_create_dst(dst_client.origin(), dst_client.identifier());
 
         assert!(dst.operations.is_empty());
-        dst.operations = operations
-            .iter()
-            .filter_map(|operation| operation.to_store(&dst.statuses))
-            .collect();
-
-        dst.statuses
-            .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
+        dst.operations = create_store_operations(&operations, &dst.statuses);
     }
+    retain_dst_statuses(stored_user, &necessary_src_identifiers);
     commit(store).await?;
     Ok(())
 }
