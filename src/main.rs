@@ -9,6 +9,7 @@
 
 mod app;
 mod config;
+mod database;
 mod destination;
 mod protocols;
 mod sources;

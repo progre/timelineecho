@@ -8,6 +8,8 @@ edition = "2021"
 anyhow = { version = "1.0.70", features = ["backtrace"] }
 async-trait = "0.1.68"
 atrium-api = { git = "https://github.com/sugyan/atrium", version = "0.1.0", rev = "0e9c3cfd4108d4d5778ff2e5f85bedbce1255dee" }
+aws-config = "0.55.2"
+aws-sdk-dynamodb = "0.27.0"
 chrono = "0.4.24"
 config = { version = "0.13.3", default-features = false, features = ["json5"] }
 futures = "0.3.28"
@@ -18,9 +20,10 @@ oauth1-request = "0.6.0"
 regex = "1.7.3"
 reqwest = { version = "0.11.16", features = ["json"] }
 serde = { version = "1.0.160", features = ["derive"] }
+serde_dynamo = { version = "4.2.2", features = ["aws-sdk-dynamodb+0_27"] }
 serde_json = "1.0.96"
 time = { version = "0.3.20", features = ["formatting"] }
-tokio = { version = "1.27.0", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.27.0", features = ["rt-multi-thread", "macros", "time"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = [
   "env-filter",

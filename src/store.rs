@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::sources::source;
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceStatus {
     pub identifier: String,
@@ -29,7 +29,7 @@ impl From<source::LiveStatus> for SourceStatus {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Source {
     pub origin: String,
@@ -101,14 +101,14 @@ pub enum Operation {
     Delete { dst_identifier: String },
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DestinationStatus {
     pub identifier: String,
     pub src_identifier: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Destination {
     pub origin: String,
@@ -117,7 +117,7 @@ pub struct Destination {
     pub operations: Vec<Operation>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct User {
     pub src: Source,
@@ -173,7 +173,7 @@ impl AccountPair {
     }
 }
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Store {
     pub users: Vec<User>,
