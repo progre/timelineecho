@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::future::join_all;
 
 use crate::{config, sources::source, store};
 
@@ -75,4 +76,17 @@ pub async fn create_client(
             .await?,
         )),
     }
+}
+
+pub async fn create_clients(
+    http_client: &Arc<reqwest::Client>,
+    accounts: &[config::Account],
+) -> Result<Vec<Box<dyn Client>>> {
+    let clients = accounts
+        .iter()
+        .map(|dst| create_client(http_client.clone(), dst));
+    join_all(clients)
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>>>()
 }
