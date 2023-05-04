@@ -206,27 +206,4 @@ impl Store {
         )
         .get_or_create_dst(&account_pair.to_dst_key())
     }
-
-    fn necessary_src_identifiers(&self) -> Vec<String> {
-        self.users
-            .iter()
-            .flat_map(|user| {
-                user.src
-                    .statuses
-                    .iter()
-                    .map(|src_status| src_status.identifier.clone())
-            })
-            .collect()
-    }
-
-    pub fn retain_all_dst_statuses(&mut self) {
-        let necessary_src_identifiers = self.necessary_src_identifiers();
-
-        for user in &mut self.users {
-            for dst in &mut user.dsts {
-                dst.statuses
-                    .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
-            }
-        }
-    }
 }

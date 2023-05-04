@@ -1,8 +1,13 @@
-use std::convert::Into;
+use std::{collections::HashMap, convert::Into, sync::Arc};
 
 use anyhow::Result;
 
-use crate::{protocols::Client, store};
+use crate::{
+    app::commit,
+    config,
+    protocols::{create_client, create_clients, to_account_key, Client},
+    store::{self, AccountKey},
+};
 
 use super::operation_factory::create_operations;
 
@@ -64,7 +69,7 @@ impl Operation {
     }
 }
 
-pub async fn fetch_statuses(
+async fn fetch_statuses(
     http_client: &reqwest::Client,
     src_client: &mut dyn Client,
     src_statuses: &[store::SourceStatus],
@@ -76,7 +81,7 @@ pub async fn fetch_statuses(
     Ok((statuses, operations))
 }
 
-pub fn create_store_operations(
+fn create_store_operations(
     operations: &[Operation],
     dst_statuses: &[store::DestinationStatus],
 ) -> Vec<store::Operation> {
@@ -84,4 +89,77 @@ pub fn create_store_operations(
         .iter()
         .filter_map(|operation| operation.to_store(dst_statuses))
         .collect()
+}
+
+fn has_users_operations(stored_user: &store::User) -> bool {
+    stored_user
+        .dsts
+        .iter()
+        .any(|dst| !dst.operations.is_empty())
+}
+
+fn update_operations(
+    stored_user: &mut store::User,
+    dst_account_keys: impl Iterator<Item = store::AccountKey>,
+    operations: &[Operation],
+) {
+    for dst_account_key in dst_account_keys {
+        let dst = stored_user.get_or_create_dst(&dst_account_key);
+        dst.operations = create_store_operations(operations, &dst.statuses);
+    }
+}
+
+pub async fn get(
+    http_client: &Arc<reqwest::Client>,
+    config_user: &config::User,
+    store: &mut store::Store,
+    dst_client_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
+) -> Result<()> {
+    let mut src_client = create_client(http_client.clone(), &config_user.src).await?;
+
+    let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
+    let src = &mut stored_user.src;
+
+    let (statuses, operations) =
+        fetch_statuses(http_client.as_ref(), src_client.as_mut(), &src.statuses).await?;
+    src.statuses = statuses;
+
+    if !operations.is_empty() || has_users_operations(&*stored_user) {
+        let dst_clients = create_clients(http_client, &config_user.dsts).await?;
+        if !operations.is_empty() {
+            let dst_account_keys = dst_clients
+                .iter()
+                .map(|dst_client| to_account_key(dst_client.as_ref()));
+            update_operations(stored_user, dst_account_keys, &operations);
+        }
+        dst_client_map.insert(to_account_key(src_client.as_ref()), dst_clients);
+    }
+    commit(&*store).await?;
+    Ok(())
+}
+
+fn necessary_src_identifiers(store: &store::Store) -> Vec<String> {
+    store
+        .users
+        .iter()
+        .flat_map(|user| {
+            user.src
+                .statuses
+                .iter()
+                .map(|src_status| src_status.identifier.clone())
+        })
+        .collect()
+}
+
+pub async fn retain_all_dst_statuses(store: &mut store::Store) -> Result<()> {
+    let necessary_src_identifiers = necessary_src_identifiers(&*store);
+
+    for user in &mut store.users {
+        for dst in &mut user.dsts {
+            dst.statuses
+                .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
+        }
+    }
+
+    commit(&*store).await
 }
