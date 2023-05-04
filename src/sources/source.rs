@@ -3,8 +3,8 @@ use std::{collections::HashMap, convert::Into, sync::Arc};
 use anyhow::Result;
 
 use crate::{
-    app::commit,
     config,
+    database::Database,
     protocols::{create_client, create_clients, to_account_key, Client},
     store::{self, AccountKey},
 };
@@ -110,6 +110,7 @@ fn update_operations(
 }
 
 pub async fn get(
+    database: &impl Database,
     http_client: &Arc<reqwest::Client>,
     config_user: &config::User,
     store: &mut store::Store,
@@ -134,7 +135,7 @@ pub async fn get(
         }
         dst_client_map.insert(to_account_key(src_client.as_ref()), dst_clients);
     }
-    commit(&*store).await?;
+    database.commit(&*store).await?;
     Ok(())
 }
 
@@ -151,7 +152,10 @@ fn necessary_src_identifiers(store: &store::Store) -> Vec<String> {
         .collect()
 }
 
-pub async fn retain_all_dst_statuses(store: &mut store::Store) -> Result<()> {
+pub async fn retain_all_dst_statuses(
+    database: &impl Database,
+    store: &mut store::Store,
+) -> Result<()> {
     let necessary_src_identifiers = necessary_src_identifiers(&*store);
 
     for user in &mut store.users {
@@ -161,5 +165,5 @@ pub async fn retain_all_dst_statuses(store: &mut store::Store) -> Result<()> {
         }
     }
 
-    commit(&*store).await
+    database.commit(&*store).await
 }

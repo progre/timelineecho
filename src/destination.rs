@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::{
-    app::commit,
+    database::Database,
     protocols::{to_account_key, Client},
     store::{
         self,
@@ -92,6 +92,7 @@ fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store:
 }
 
 pub async fn post(
+    database: &impl Database,
     store: &mut store::Store,
     dst_clients_map: &mut HashMap<store::AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
@@ -109,7 +110,7 @@ pub async fn post(
             .unwrap();
 
         post_operation(stored_dst, dst_client.as_mut(), operation).await?;
-        commit(store).await?;
+        database.commit(store).await?;
     }
 
     Ok(())
