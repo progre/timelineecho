@@ -7,13 +7,31 @@ use tokio::fs;
 use crate::{
     config::Config,
     destination::post,
-    protocols::{create_client, create_clients},
-    sources::source::{create_store_operations, fetch_statuses},
+    protocols::{create_client, create_clients, to_account_key},
+    sources::source::{self, create_store_operations, fetch_statuses},
     store,
 };
 
 pub async fn commit(store: &store::Store) -> Result<()> {
     Ok(fs::write("store.json", serde_json::to_string_pretty(store)?).await?)
+}
+
+fn has_users_operations(stored_user: &store::User) -> bool {
+    stored_user
+        .dsts
+        .iter()
+        .any(|dst| !dst.operations.is_empty())
+}
+
+fn update_operations(
+    stored_user: &mut store::User,
+    dst_account_keys: impl Iterator<Item = store::AccountKey>,
+    operations: &[source::Operation],
+) {
+    for dst_account_key in dst_account_keys {
+        let dst = stored_user.get_or_create_dst(&dst_account_key);
+        dst.operations = create_store_operations(operations, &dst.statuses);
+    }
 }
 
 pub async fn app() -> Result<()> {
@@ -38,20 +56,15 @@ pub async fn app() -> Result<()> {
             fetch_statuses(http_client.as_ref(), src_client.as_mut(), &src.statuses).await?;
         src.statuses = statuses;
 
-        if !operations.is_empty() {
-            create_clients(&http_client, &config_user.dsts)
-                .await?
-                .into_iter()
-                .for_each(|dst_client| {
-                    let dst =
-                        stored_user.get_or_create_dst(dst_client.origin(), dst_client.identifier());
-                    dst.operations = create_store_operations(&operations, &dst.statuses);
-
-                    dst_client_map.insert(
-                        store::AccountPair::from_clients(src_client.as_ref(), dst_client.as_ref()),
-                        dst_client,
-                    );
-                });
+        if !operations.is_empty() || has_users_operations(stored_user) {
+            let dst_clients = create_clients(&http_client, &config_user.dsts).await?;
+            if !operations.is_empty() {
+                let dst_account_keys = dst_clients
+                    .iter()
+                    .map(|dst_client| to_account_key(dst_client.as_ref()));
+                update_operations(stored_user, dst_account_keys, &operations);
+            }
+            dst_client_map.insert(to_account_key(src_client.as_ref()), dst_clients);
         }
 
         commit(&store).await?;

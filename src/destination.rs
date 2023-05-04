@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{
     app::commit,
-    protocols::Client,
+    protocols::{to_account_key, Client},
     store::{
         self,
         Operation::{Create, Delete, Update},
@@ -93,7 +93,7 @@ fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store:
 
 pub async fn post(
     store: &mut store::Store,
-    dst_client_map: &mut HashMap<store::AccountPair, Box<dyn Client>>,
+    dst_clients_map: &mut HashMap<store::AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
     loop {
         let Some((account_pair, operation)) = pop_operation(store) else {
@@ -101,7 +101,12 @@ pub async fn post(
         };
 
         let stored_dst = store.get_or_create_dst(&account_pair);
-        let dst_client = dst_client_map.get_mut(&account_pair).unwrap();
+        let dst_client = dst_clients_map
+            .get_mut(&account_pair.to_src_key())
+            .unwrap()
+            .iter_mut()
+            .find(|dst_client| to_account_key(dst_client.as_ref()) == account_pair.to_dst_key())
+            .unwrap();
 
         post_operation(stored_dst, dst_client.as_mut(), operation).await?;
         commit(store).await?;

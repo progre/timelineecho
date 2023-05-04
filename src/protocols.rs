@@ -11,7 +11,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::future::join_all;
 
-use crate::{config, sources::source, store};
+use crate::{
+    config,
+    sources::source,
+    store::{self, AccountKey},
+};
 
 #[async_trait(?Send)]
 pub trait Client {
@@ -31,6 +35,13 @@ pub trait Client {
     ) -> Result<String>;
 
     async fn delete(&mut self, identifier: &str) -> Result<()>;
+}
+
+pub fn to_account_key(client: &dyn Client) -> AccountKey {
+    AccountKey {
+        origin: client.origin().to_owned(),
+        identifier: client.identifier().to_owned(),
+    }
 }
 
 pub async fn create_client(

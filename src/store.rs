@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{protocols::Client, sources::source};
+use crate::sources::source;
 
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -125,26 +125,27 @@ pub struct User {
 }
 
 impl User {
-    pub fn get_or_create_dst<'a>(
-        &'a mut self,
-        origin: &str,
-        identifier: &str,
-    ) -> &'a mut Destination {
-        let idx = self
-            .dsts
-            .iter()
-            .position(|dst| dst.origin == origin && dst.identifier == identifier);
+    pub fn get_or_create_dst<'a>(&'a mut self, account_key: &AccountKey) -> &'a mut Destination {
+        let idx = self.dsts.iter().position(|dst| {
+            dst.origin == account_key.origin && dst.identifier == account_key.identifier
+        });
         if let Some(idx) = idx {
             return &mut self.dsts[idx];
         }
         self.dsts.push(Destination {
-            origin: origin.to_owned(),
-            identifier: identifier.to_owned(),
+            origin: account_key.origin.clone(),
+            identifier: account_key.identifier.clone(),
             statuses: Vec::default(),
             operations: Vec::default(),
         });
         self.dsts.last_mut().unwrap()
     }
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct AccountKey {
+    pub origin: String,
+    pub identifier: String,
 }
 
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -157,12 +158,17 @@ pub struct AccountPair {
 }
 
 impl AccountPair {
-    pub fn from_clients(src_client: &dyn Client, dst_client: &dyn Client) -> Self {
-        Self {
-            src_origin: src_client.origin().to_owned(),
-            src_account_identifier: src_client.identifier().to_owned(),
-            dst_origin: dst_client.origin().to_owned(),
-            dst_account_identifier: dst_client.identifier().to_owned(),
+    pub fn to_src_key(&self) -> AccountKey {
+        AccountKey {
+            origin: self.src_origin.clone(),
+            identifier: self.src_account_identifier.clone(),
+        }
+    }
+
+    pub fn to_dst_key(&self) -> AccountKey {
+        AccountKey {
+            origin: self.dst_origin.clone(),
+            identifier: self.dst_account_identifier.clone(),
         }
     }
 }
@@ -198,10 +204,7 @@ impl Store {
             &account_pair.src_origin,
             &account_pair.src_account_identifier,
         )
-        .get_or_create_dst(
-            &account_pair.dst_origin,
-            &account_pair.dst_account_identifier,
-        )
+        .get_or_create_dst(&account_pair.to_dst_key())
     }
 
     fn necessary_src_identifiers(&self) -> Vec<String> {
