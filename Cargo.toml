@@ -9,14 +9,19 @@ anyhow = { version = "1.0.70", features = ["backtrace"] }
 async-trait = "0.1.68"
 atrium-api = { git = "https://github.com/sugyan/atrium", version = "0.1.0", rev = "0e9c3cfd4108d4d5778ff2e5f85bedbce1255dee" }
 aws-config = "0.55.2"
+aws_lambda_events = { version = "0.7.3", default-features = false, features = [
+  "cloudwatch_events"
+] }
 aws-sdk-dynamodb = "0.27.0"
 chrono = "0.4.24"
 config = { version = "0.13.3", default-features = false, features = ["json5"] }
 futures = "0.3.28"
 html2text = "0.5.1"
+lambda_runtime = "0.8.0"
 linkify = "0.9.0"
 megalodon = "0.7.0"
 oauth1-request = "0.6.0"
+openssl = { version = "0.10", features = ["vendored"] }
 regex = "1.7.3"
 reqwest = { version = "0.11.16", features = ["json"] }
 serde = { version = "1.0.160", features = ["derive"] }

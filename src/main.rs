@@ -18,7 +18,8 @@ mod store;
 use std::num::NonZeroU8;
 
 use anyhow::Result;
-use app::app;
+use aws_lambda_events::event::cloudwatch_events::CloudWatchEvent;
+use lambda_runtime::{run, service_fn, Error, LambdaEvent};
 use time::format_description::well_known::{
     iso8601::{self, EncodedConfig},
     Iso8601,
@@ -29,6 +30,8 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
     EnvFilter,
 };
+
+use app::app;
 
 pub fn init_tracing() {
     const MY_CONFIG: EncodedConfig = iso8601::Config::DEFAULT
@@ -46,9 +49,17 @@ pub fn init_tracing() {
         .init();
 }
 
+async fn function_handler(_event: LambdaEvent<CloudWatchEvent>) -> Result<(), Error> {
+    if let Err(err) = app().await {
+        tracing::error!("{:?}", err);
+        return Err(err.into());
+    }
+    Ok(())
+}
+
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Error> {
     init_tracing();
 
-    app().await
+    run(service_fn(function_handler)).await
 }
