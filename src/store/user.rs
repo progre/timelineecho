@@ -48,7 +48,6 @@ pub struct Destination {
     pub origin: String,
     pub identifier: String,
     pub statuses: Vec<DestinationStatus>,
-    pub operations: Vec<super::operation::Operation>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -70,7 +69,6 @@ impl User {
             origin: account_key.origin.clone(),
             identifier: account_key.identifier.clone(),
             statuses: Vec::default(),
-            operations: Vec::default(),
         });
         self.dsts.last_mut().unwrap()
     }

@@ -115,3 +115,21 @@ pub enum Operation {
         dst_identifier: String,
     },
 }
+
+impl Operation {
+    pub fn account_pair(&self) -> &AccountPair {
+        match self {
+            Operation::Create(content) => &content.account_pair,
+            Operation::Update {
+                account_pair,
+                dst_identifier: _,
+                content: _,
+                facets: _,
+            }
+            | Operation::Delete {
+                account_pair,
+                dst_identifier: _,
+            } => account_pair,
+        }
+    }
+}

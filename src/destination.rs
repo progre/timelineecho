@@ -79,26 +79,6 @@ pub async fn post_operation(
     Ok(())
 }
 
-fn pop_operation(
-    store: &mut store::Store,
-) -> Option<(store::operation::AccountPair, store::operation::Operation)> {
-    let user = store
-        .users
-        .iter_mut()
-        .find(|user| user.dsts.iter().any(|dst| !dst.operations.is_empty()))?;
-    let dst = user
-        .dsts
-        .iter_mut()
-        .find(|dst| !dst.operations.is_empty())?;
-    let account_pair = store::operation::AccountPair {
-        src_origin: user.src.origin.clone(),
-        src_account_identifier: user.src.identifier.clone(),
-        dst_origin: dst.origin.clone(),
-        dst_account_identifier: dst.identifier.clone(),
-    };
-    Some((account_pair, dst.operations.pop().unwrap()))
-}
-
 pub async fn post(
     database: &impl Database,
     store: &mut store::Store,
@@ -106,16 +86,16 @@ pub async fn post(
 ) -> Result<()> {
     // WTF: DynamoDB の連続アクセス不能問題が解消するまで連続作業を絞る
     for _ in 0..2 {
-        let Some((account_pair, operation)) = pop_operation(store) else {
+        let Some(operation) = store.operations.pop() else {
             break;
         };
 
-        let stored_dst = store.get_or_create_dst(&account_pair);
+        let stored_dst = store.get_or_create_dst(operation.account_pair());
         let dst_client = dst_clients_map
-            .get_mut(&account_pair.to_src_key())
+            .get_mut(&operation.account_pair().to_src_key())
             .unwrap()
             .iter_mut()
-            .find(|dst_client| dst_client.to_account_key() == account_pair.to_dst_key())
+            .find(|dst_client| dst_client.to_account_key() == operation.account_pair().to_dst_key())
             .unwrap();
 
         post_operation(stored_dst, dst_client.as_mut(), operation).await?;

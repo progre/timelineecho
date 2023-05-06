@@ -80,8 +80,8 @@ impl Operation {
 }
 
 async fn fetch_statuses(
-    http_client: &reqwest::Client,
     src_client: &mut dyn Client,
+    http_client: &reqwest::Client,
     src_statuses: &[store::user::SourceStatus],
 ) -> Result<(Vec<store::user::SourceStatus>, Vec<Operation>)> {
     let live_statuses = src_client.fetch_statuses().await?;
@@ -102,25 +102,30 @@ fn create_store_operations(
         .collect()
 }
 
-fn has_users_operations(stored_user: &store::user::User) -> bool {
-    stored_user
-        .dsts
+fn has_users_operations(operations: &[store::operation::Operation], src_key: &AccountKey) -> bool {
+    operations
         .iter()
-        .any(|dst| !dst.operations.is_empty())
+        .any(|operation| &operation.account_pair().to_src_key() == src_key)
 }
 
-fn update_operations(
+fn to_store_operations(
     stored_user: &mut store::user::User,
     src_account_key: &AccountKey,
     dst_account_keys: impl Iterator<Item = AccountKey>,
     operations: &[Operation],
-) {
+) -> Vec<store::operation::Operation> {
+    let mut vec = Vec::new();
     for dst_account_key in dst_account_keys {
         let dst = stored_user.get_or_create_dst(&dst_account_key);
         let account_pair =
             store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
-        dst.operations = create_store_operations(operations, &account_pair, &dst.statuses);
+        vec.append(&mut create_store_operations(
+            operations,
+            &account_pair,
+            &dst.statuses,
+        ));
     }
+    vec
 }
 
 pub async fn get(
@@ -131,23 +136,26 @@ pub async fn get(
     dst_client_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
     let mut src_client = create_client(http_client.clone(), &config_user.src).await?;
+    let src_account_key = src_client.to_account_key();
 
-    let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
+    let has_users_operations = has_users_operations(&store.operations, &src_account_key);
+    let stored_user = store.get_or_create_user(&src_account_key);
     let src = &mut stored_user.src;
     let initialize = src.statuses.is_empty();
 
     let (statuses, operations) =
-        fetch_statuses(http_client.as_ref(), src_client.as_mut(), &src.statuses).await?;
+        fetch_statuses(src_client.as_mut(), http_client.as_ref(), &src.statuses).await?;
     src.statuses = statuses;
 
-    if !operations.is_empty() || has_users_operations(&*stored_user) {
+    if !operations.is_empty() || has_users_operations {
         let dst_clients = create_clients(http_client, &config_user.dsts).await?;
         if !operations.is_empty() {
-            let src_account_key = src_client.to_account_key();
             let dst_account_keys = dst_clients
                 .iter()
                 .map(|dst_client| dst_client.to_account_key());
-            update_operations(stored_user, &src_account_key, dst_account_keys, &operations);
+            let mut new_operations =
+                to_store_operations(stored_user, &src_account_key, dst_account_keys, &operations);
+            store.operations.append(&mut new_operations);
         }
         dst_client_map.insert(src_client.to_account_key(), dst_clients);
     }
