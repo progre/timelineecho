@@ -120,6 +120,7 @@ pub async fn get(
 
     let stored_user = store.get_or_create_user(src_client.origin(), src_client.identifier());
     let src = &mut stored_user.src;
+    let initialize = src.statuses.is_empty();
 
     let (statuses, operations) =
         fetch_statuses(http_client.as_ref(), src_client.as_mut(), &src.statuses).await?;
@@ -132,9 +133,11 @@ pub async fn get(
                 .iter()
                 .map(|dst_client| to_account_key(dst_client.as_ref()));
             update_operations(stored_user, dst_account_keys, &operations);
-            database.commit(&*store).await?;
         }
         dst_client_map.insert(to_account_key(src_client.as_ref()), dst_clients);
+    }
+    if initialize || !operations.is_empty() {
+        database.commit(&*store).await?;
     }
     Ok(())
 }
