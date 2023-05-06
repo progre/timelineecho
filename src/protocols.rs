@@ -19,6 +19,13 @@ use crate::{
 
 #[async_trait(?Send)]
 pub trait Client {
+    fn to_account_key(&self) -> AccountKey {
+        AccountKey {
+            origin: self.origin().to_owned(),
+            identifier: self.identifier().to_owned(),
+        }
+    }
+
     fn origin(&self) -> &str;
     fn identifier(&self) -> &str;
 
@@ -35,13 +42,6 @@ pub trait Client {
     ) -> Result<String>;
 
     async fn delete(&mut self, identifier: &str) -> Result<()>;
-}
-
-pub fn to_account_key(client: &dyn Client) -> AccountKey {
-    AccountKey {
-        origin: client.origin().to_owned(),
-        identifier: client.identifier().to_owned(),
-    }
 }
 
 pub async fn create_client(

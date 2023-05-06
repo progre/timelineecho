@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{
     database::Database,
-    protocols::{to_account_key, Client},
+    protocols::Client,
     store::{
         self,
         Operation::{Create, Delete, Update},
@@ -107,7 +107,7 @@ pub async fn post(
             .get_mut(&account_pair.to_src_key())
             .unwrap()
             .iter_mut()
-            .find(|dst_client| to_account_key(dst_client.as_ref()) == account_pair.to_dst_key())
+            .find(|dst_client| dst_client.to_account_key() == account_pair.to_dst_key())
             .unwrap();
 
         post_operation(stored_dst, dst_client.as_mut(), operation).await?;

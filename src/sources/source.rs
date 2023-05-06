@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::{
     config,
     database::Database,
-    protocols::{create_client, create_clients, to_account_key, Client},
+    protocols::{create_client, create_clients, Client},
     store::{self, AccountKey},
 };
 
@@ -131,10 +131,10 @@ pub async fn get(
         if !operations.is_empty() {
             let dst_account_keys = dst_clients
                 .iter()
-                .map(|dst_client| to_account_key(dst_client.as_ref()));
+                .map(|dst_client| dst_client.to_account_key());
             update_operations(stored_user, dst_account_keys, &operations);
         }
-        dst_client_map.insert(to_account_key(src_client.as_ref()), dst_clients);
+        dst_client_map.insert(src_client.to_account_key(), dst_clients);
     }
     if initialize || !operations.is_empty() {
         database.commit(&*store).await?;
