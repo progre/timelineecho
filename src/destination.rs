@@ -96,7 +96,8 @@ pub async fn post(
     store: &mut store::Store,
     dst_clients_map: &mut HashMap<store::AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
-    loop {
+    // WTF: DynamoDB の連続アクセス不能問題が解消するまで連続作業を絞る
+    for _ in 0..2 {
         let Some((account_pair, operation)) = pop_operation(store) else {
             break;
         };

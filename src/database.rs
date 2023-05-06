@@ -39,10 +39,11 @@ impl Database for File {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DynamoDBConfigRoot {
     #[allow(unused)]
     id: u64,
-    configJson: String,
+    config_json: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -77,7 +78,7 @@ impl Database for DynamoDB {
             .ok_or_else(|| anyhow!("object not found"))?
             .clone();
         let root: DynamoDBConfigRoot = from_item(item)?;
-        Ok(serde_json::from_str(&root.configJson)?)
+        Ok(serde_json::from_str(&root.config_json)?)
     }
 
     async fn fetch(&self) -> Result<store::Store> {
@@ -96,20 +97,21 @@ impl Database for DynamoDB {
     }
 
     async fn commit(&self, store: &store::Store) -> Result<()> {
+        info!("commit to dynamodb...");
         let store = DynamoDBRoot {
             id: 0,
             store: store.clone(),
         };
         let item: HashMap<_, _> = to_item(store)?;
         loop {
-            if let Err(err) = self
+            let res = self
                 .client
                 .put_item()
                 .table_name("root")
                 .set_item(Some(item.clone()))
                 .send()
-                .await
-            {
+                .await;
+            if let Err(err) = res {
                 error!("{:?}", err);
                 info!("sleep 10 secs...");
                 sleep(Duration::from_secs(10)).await;
@@ -117,6 +119,8 @@ impl Database for DynamoDB {
             }
             break;
         }
+        info!("commit succeeded and sleep 10 secs...");
+        sleep(Duration::from_secs(10)).await;
         Ok(())
     }
 }

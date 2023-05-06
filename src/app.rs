@@ -8,9 +8,7 @@ use crate::{
     sources::source::{get, retain_all_dst_statuses},
 };
 
-pub async fn app() -> Result<()> {
-    let database = crate::database::DynamoDB::new().await;
-
+pub async fn app(database: &impl Database) -> Result<()> {
     let config = database.config().await?;
 
     let mut store = database.fetch().await.unwrap_or_default();
@@ -19,7 +17,7 @@ pub async fn app() -> Result<()> {
     let mut dst_client_map = HashMap::new();
     for config_user in &config.users {
         get(
-            &database,
+            database,
             &http_client,
             config_user,
             &mut store,
@@ -27,8 +25,8 @@ pub async fn app() -> Result<()> {
         )
         .await?;
     }
-    post(&database, &mut store, &mut dst_client_map).await?;
-    retain_all_dst_statuses(&database, &mut store).await?;
+    post(database, &mut store, &mut dst_client_map).await?;
+    retain_all_dst_statuses(database, &mut store).await?;
 
     Ok(())
 }

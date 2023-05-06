@@ -132,10 +132,10 @@ pub async fn get(
                 .iter()
                 .map(|dst_client| to_account_key(dst_client.as_ref()));
             update_operations(stored_user, dst_account_keys, &operations);
+            database.commit(&*store).await?;
         }
         dst_client_map.insert(to_account_key(src_client.as_ref()), dst_clients);
     }
-    database.commit(&*store).await?;
     Ok(())
 }
 
@@ -158,12 +158,19 @@ pub async fn retain_all_dst_statuses(
 ) -> Result<()> {
     let necessary_src_identifiers = necessary_src_identifiers(&*store);
 
+    let mut updated = false;
     for user in &mut store.users {
         for dst in &mut user.dsts {
+            let len = dst.statuses.len();
             dst.statuses
                 .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
+            if dst.statuses.len() != len {
+                updated = true;
+            }
         }
     }
-
-    database.commit(&*store).await
+    if updated {
+        database.commit(&*store).await?;
+    }
+    Ok(())
 }
