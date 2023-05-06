@@ -31,15 +31,16 @@ pub async fn post_operation(
     operation: store::operation::Operation,
 ) -> Result<()> {
     match operation {
-        Create(store::operation::CreatingStatus {
-            src_identifier,
-            content,
-            facets,
-            reply_src_identifier,
-            media,
-            external,
-            created_at,
-        }) => {
+        Create(content) => {
+            let store::operation::CreatingStatus {
+                src_identifier,
+                content,
+                facets,
+                reply_src_identifier,
+                media,
+                external,
+                created_at,
+            } = content.status;
             let dst_statuses = &mut stored_dst.statuses;
             let reply_identifier = reply_src_identifier
                 .and_then(|reply| to_dst_identifier(&reply, dst_statuses.as_ref()));
@@ -62,11 +63,15 @@ pub async fn post_operation(
             );
         }
         Update {
+            account_pair: _,
             dst_identifier: _,
             content: _,
             facets: _,
         } => todo!(),
-        Delete { dst_identifier } => {
+        Delete {
+            account_pair: _,
+            dst_identifier,
+        } => {
             dst_client.delete(&dst_identifier).await?;
         }
     }

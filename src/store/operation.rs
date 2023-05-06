@@ -14,6 +14,15 @@ pub struct AccountPair {
 }
 
 impl AccountPair {
+    pub fn from_keys(src_account_key: AccountKey, dst_account_key: AccountKey) -> Self {
+        Self {
+            src_origin: src_account_key.origin,
+            src_account_identifier: src_account_key.identifier,
+            dst_origin: dst_account_key.origin,
+            dst_account_identifier: dst_account_key.identifier,
+        }
+    }
+
     pub fn to_src_key(&self) -> AccountKey {
         AccountKey {
             origin: self.src_origin.clone(),
@@ -77,18 +86,32 @@ pub struct CreatingStatus {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
+pub struct Create {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    #[serde(flatten)]
+    pub status: CreatingStatus,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "operation")]
 pub enum Operation {
     #[serde(rename_all = "camelCase")]
-    Create(CreatingStatus),
+    Create(Box<Create>),
     #[serde(rename_all = "camelCase")]
     Update {
+        #[serde(flatten)]
+        account_pair: AccountPair,
         dst_identifier: String,
         content: String,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         facets: Vec<Facet>,
     },
     #[serde(rename_all = "camelCase")]
-    Delete { dst_identifier: String },
+    Delete {
+        #[serde(flatten)]
+        account_pair: AccountPair,
+        dst_identifier: String,
+    },
 }

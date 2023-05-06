@@ -45,11 +45,15 @@ pub enum Operation {
 impl Operation {
     pub fn to_store(
         &self,
+        account_pair: store::operation::AccountPair,
         dst_statuses: &[store::user::DestinationStatus],
     ) -> Option<store::operation::Operation> {
         match self {
             Operation::Create(source_status_full) => Some(store::operation::Operation::Create(
-                source_status_full.clone(),
+                Box::new(store::operation::Create {
+                    account_pair,
+                    status: source_status_full.clone(),
+                }),
             )),
             Operation::Update {
                 src_identifier,
@@ -59,6 +63,7 @@ impl Operation {
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| store::operation::Operation::Update {
+                    account_pair,
                     dst_identifier: dst.identifier.clone(),
                     content: content.clone(),
                     facets: facets.clone(),
@@ -67,6 +72,7 @@ impl Operation {
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| store::operation::Operation::Delete {
+                    account_pair,
                     dst_identifier: dst.identifier.clone(),
                 }),
         }
@@ -87,11 +93,12 @@ async fn fetch_statuses(
 
 fn create_store_operations(
     operations: &[Operation],
+    account_pair: &store::operation::AccountPair,
     dst_statuses: &[store::user::DestinationStatus],
 ) -> Vec<store::operation::Operation> {
     operations
         .iter()
-        .filter_map(|operation| operation.to_store(dst_statuses))
+        .filter_map(|operation| operation.to_store(account_pair.clone(), dst_statuses))
         .collect()
 }
 
@@ -104,12 +111,15 @@ fn has_users_operations(stored_user: &store::user::User) -> bool {
 
 fn update_operations(
     stored_user: &mut store::user::User,
+    src_account_key: &AccountKey,
     dst_account_keys: impl Iterator<Item = AccountKey>,
     operations: &[Operation],
 ) {
     for dst_account_key in dst_account_keys {
         let dst = stored_user.get_or_create_dst(&dst_account_key);
-        dst.operations = create_store_operations(operations, &dst.statuses);
+        let account_pair =
+            store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
+        dst.operations = create_store_operations(operations, &account_pair, &dst.statuses);
     }
 }
 
@@ -133,10 +143,11 @@ pub async fn get(
     if !operations.is_empty() || has_users_operations(&*stored_user) {
         let dst_clients = create_clients(http_client, &config_user.dsts).await?;
         if !operations.is_empty() {
+            let src_account_key = src_client.to_account_key();
             let dst_account_keys = dst_clients
                 .iter()
                 .map(|dst_client| dst_client.to_account_key());
-            update_operations(stored_user, dst_account_keys, &operations);
+            update_operations(stored_user, &src_account_key, dst_account_keys, &operations);
         }
         dst_client_map.insert(src_client.to_account_key(), dst_clients);
     }
