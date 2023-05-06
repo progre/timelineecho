@@ -7,6 +7,14 @@
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::unreadable_literal)]
 
+use tracing_subscriber::{
+    fmt::{
+        format::{DefaultFields, Format},
+        SubscriberBuilder,
+    },
+    EnvFilter,
+};
+
 mod app;
 mod config;
 mod database;
@@ -14,6 +22,13 @@ mod destination;
 mod protocols;
 mod sources;
 mod store;
+
+fn default_subscriber_builder() -> SubscriberBuilder<DefaultFields, Format, EnvFilter> {
+    tracing_subscriber::fmt().with_env_filter(
+        EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| EnvFilter::from("timelineecho=trace,reqwest=trace")),
+    )
+}
 
 #[cfg(not(target_os = "linux"))]
 mod local {
@@ -24,14 +39,9 @@ mod local {
         iso8601::{self, EncodedConfig},
         Iso8601,
     };
-    use tracing_subscriber::{
-        fmt::{self, time::LocalTime},
-        prelude::__tracing_subscriber_SubscriberExt,
-        util::SubscriberInitExt,
-        EnvFilter,
-    };
+    use tracing_subscriber::fmt::time::LocalTime;
 
-    use crate::{app::app, database};
+    use crate::{app::app, database, default_subscriber_builder};
 
     pub fn init_tracing() {
         const MY_CONFIG: EncodedConfig = iso8601::Config::DEFAULT
@@ -39,13 +49,9 @@ mod local {
                 decimal_digits: NonZeroU8::new(6),
             })
             .encode();
-        let fmt = Iso8601::<MY_CONFIG>;
-        tracing_subscriber::registry()
-            .with(
-                EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| EnvFilter::from("timelineecho=trace,reqwest=trace")),
-            )
-            .with(fmt::layer().with_timer(LocalTime::new(fmt)).compact())
+        default_subscriber_builder()
+            .with_timer(LocalTime::new(Iso8601::<MY_CONFIG>))
+            .compact()
             .init();
     }
 
@@ -59,19 +65,14 @@ mod local {
 mod lambda {
     use aws_lambda_events::event::cloudwatch_events::CloudWatchEvent;
     use lambda_runtime::{run, service_fn, LambdaEvent};
-    use tracing_subscriber::EnvFilter;
 
-    use crate::{app::app, database};
+    use crate::{app::app, database, default_subscriber_builder};
 
     pub fn init_tracing() {
-        tracing_subscriber::fmt()
-            .with_env_filter(
-                EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| EnvFilter::from("timelineecho=trace,reqwest=trace")),
-            )
+        default_subscriber_builder()
+            .without_time()
             .with_ansi(false)
             .with_target(false)
-            .without_time()
             .init();
     }
 
