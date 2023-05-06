@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 
 use crate::{
     sources::source,
-    store::{self, Facet},
+    store::{self, operation::Facet::Link},
 };
 
 use super::at_proto::{
@@ -19,7 +19,7 @@ use super::at_proto::{
 
 fn to_record<'a>(
     text: &'a str,
-    facets: &'a [store::Facet],
+    facets: &'a [store::operation::Facet],
     reply: Option<ReplyRef>,
     embed: Option<&'a Embed>,
     created_at: &'a str,
@@ -30,7 +30,7 @@ fn to_record<'a>(
             .iter()
             .map(|facet| match facet {
                 // NOTE: 実装予定なし
-                // Facet::Mention {
+                // Mention {
                 //     byte_slice,
                 //     src_identifier,
                 // } => {
@@ -45,7 +45,7 @@ fn to_record<'a>(
                 //         }]
                 //     })
                 // }
-                Facet::Link { byte_slice, uri } => json!({
+                Link { byte_slice, uri } => json!({
                     "index": {
                         "byteStart": byte_slice.start,
                         "byteEnd": byte_slice.end
@@ -117,8 +117,8 @@ impl Client {
     async fn to_embed(
         &self,
         session: &Session,
-        images: Vec<store::Medium>,
-        external: Option<store::External>,
+        images: Vec<store::operation::Medium>,
+        external: Option<store::operation::External>,
     ) -> Result<Option<Embed>> {
         if !images.is_empty() {
             let mut array = Vec::new();
@@ -213,10 +213,10 @@ impl super::Client for Client {
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::Facet],
+        facets: &[store::operation::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::Medium>,
-        external: Option<store::External>,
+        images: Vec<store::operation::Medium>,
+        external: Option<store::operation::External>,
         created_at: &str,
     ) -> Result<String> {
         let session = match &self.session {

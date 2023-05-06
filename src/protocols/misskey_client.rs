@@ -27,10 +27,10 @@ fn get_as_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>> {
         .ok_or_else(|| anyhow!("{} is not array", key))
 }
 
-fn create_facets(content: &str) -> Vec<store::Facet> {
+fn create_facets(content: &str) -> Vec<store::operation::Facet> {
     LinkFinder::new()
         .links(content)
-        .map(|link| store::Facet::Link {
+        .map(|link| store::operation::Facet::Link {
             byte_slice: link.start() as u32..link.end() as u32,
             uri: link.as_str().to_owned(),
         })
@@ -102,7 +102,7 @@ impl super::Client for Client {
                     media: get_as_array(item, "files")?
                         .iter()
                         .map(|file| {
-                            Ok(store::Medium {
+                            Ok(store::operation::Medium {
                                 url: get_as_string(file, "url")?,
                                 alt: get_as_string_opt(file, "comment")?.unwrap_or_default(),
                             })
@@ -119,10 +119,10 @@ impl super::Client for Client {
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::Facet],
+        facets: &[store::operation::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::Medium>,
-        external: Option<store::External>,
+        images: Vec<store::operation::Medium>,
+        external: Option<store::operation::External>,
         created_at: &str,
     ) -> Result<String> {
         todo!();

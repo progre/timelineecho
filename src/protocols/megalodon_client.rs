@@ -27,14 +27,14 @@ fn trace_header(header: &HeaderMap) {
         });
 }
 
-fn link(current_idx: usize, uri: &str) -> store::Facet {
-    store::Facet::Link {
+fn link(current_idx: usize, uri: &str) -> store::operation::Facet {
+    store::operation::Facet::Link {
         byte_slice: (current_idx as u32)..(current_idx as u32) + (uri.as_bytes().len() as u32),
         uri: uri.to_owned(),
     }
 }
 
-fn html_to_content_facets(html: &str) -> (String, Vec<store::Facet>) {
+fn html_to_content_facets(html: &str) -> (String, Vec<store::operation::Facet>) {
     let content = html2text::from_read_rich(html.as_bytes(), usize::MAX);
     let mut text = String::new();
     let mut facets = Vec::new();
@@ -122,7 +122,7 @@ impl super::Client for Client {
                     media: status
                         .media_attachments
                         .into_iter()
-                        .map(|media| store::Medium {
+                        .map(|media| store::operation::Medium {
                             url: media.url,
                             alt: media.description.unwrap_or_default(),
                         })
@@ -130,7 +130,7 @@ impl super::Client for Client {
                     external: status.card.map_or_else(
                         || source::LiveExternal::None,
                         |card| {
-                            source::LiveExternal::Some(store::External {
+                            source::LiveExternal::Some(store::operation::External {
                                 uri: card.url,
                                 title: card.title,
                                 description: card.description,
@@ -152,10 +152,10 @@ impl super::Client for Client {
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::Facet],
+        facets: &[store::operation::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::Medium>,
-        external: Option<store::External>,
+        images: Vec<store::operation::Medium>,
+        external: Option<store::operation::External>,
         created_at: &str,
     ) -> Result<String> {
         todo!();

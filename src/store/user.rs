@@ -9,8 +9,8 @@ pub struct SourceStatus {
     pub content: String,
 }
 
-impl From<super::CreatingStatus> for SourceStatus {
-    fn from(full: super::CreatingStatus) -> Self {
+impl From<super::operation::CreatingStatus> for SourceStatus {
+    fn from(full: super::operation::CreatingStatus) -> Self {
         SourceStatus {
             identifier: full.src_identifier,
             content: full.content,
@@ -48,7 +48,7 @@ pub struct Destination {
     pub origin: String,
     pub identifier: String,
     pub statuses: Vec<DestinationStatus>,
-    pub operations: Vec<super::Operation>,
+    pub operations: Vec<super::operation::Operation>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

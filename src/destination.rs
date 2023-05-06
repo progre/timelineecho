@@ -8,7 +8,7 @@ use crate::{
     protocols::Client,
     store::{
         self,
-        Operation::{Create, Delete, Update},
+        operation::Operation::{Create, Delete, Update},
     },
 };
 
@@ -28,10 +28,10 @@ fn to_dst_identifier<'a>(
 pub async fn post_operation(
     stored_dst: &mut store::user::Destination,
     dst_client: &mut dyn Client,
-    operation: store::Operation,
+    operation: store::operation::Operation,
 ) -> Result<()> {
     match operation {
-        Create(store::CreatingStatus {
+        Create(store::operation::CreatingStatus {
             src_identifier,
             content,
             facets,
@@ -74,7 +74,9 @@ pub async fn post_operation(
     Ok(())
 }
 
-fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store::Operation)> {
+fn pop_operation(
+    store: &mut store::Store,
+) -> Option<(store::operation::AccountPair, store::operation::Operation)> {
     let user = store
         .users
         .iter_mut()
@@ -83,7 +85,7 @@ fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store:
         .dsts
         .iter_mut()
         .find(|dst| !dst.operations.is_empty())?;
-    let account_pair = store::AccountPair {
+    let account_pair = store::operation::AccountPair {
         src_origin: user.src.origin.clone(),
         src_account_identifier: user.src.identifier.clone(),
         dst_origin: dst.origin.clone(),

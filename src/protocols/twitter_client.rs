@@ -65,10 +65,10 @@ impl super::Client for Client {
     async fn post(
         &mut self,
         content: &str,
-        _facets: &[store::Facet],
+        _facets: &[store::operation::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::Medium>,
-        _external: Option<store::External>,
+        images: Vec<store::operation::Medium>,
+        _external: Option<store::operation::External>,
         _created_at: &str,
     ) -> Result<String> {
         let media = if images.is_empty() {

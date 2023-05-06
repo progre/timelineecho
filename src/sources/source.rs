@@ -14,7 +14,7 @@ use super::operation_factory::create_operations;
 
 #[derive(Clone)]
 pub enum LiveExternal {
-    Some(store::External),
+    Some(store::operation::External),
     None,
     Unknown,
 }
@@ -23,19 +23,19 @@ pub enum LiveExternal {
 pub struct LiveStatus {
     pub identifier: String,
     pub content: String,
-    pub facets: Vec<store::Facet>,
+    pub facets: Vec<store::operation::Facet>,
     pub reply_src_identifier: Option<String>,
-    pub media: Vec<store::Medium>,
+    pub media: Vec<store::operation::Medium>,
     pub external: LiveExternal,
     pub created_at: String,
 }
 
 pub enum Operation {
-    Create(store::CreatingStatus),
+    Create(store::operation::CreatingStatus),
     Update {
         src_identifier: String,
         content: String,
-        facets: Vec<store::Facet>,
+        facets: Vec<store::operation::Facet>,
     },
     Delete {
         src_identifier: String,
@@ -46,11 +46,11 @@ impl Operation {
     pub fn to_store(
         &self,
         dst_statuses: &[store::user::DestinationStatus],
-    ) -> Option<store::Operation> {
+    ) -> Option<store::operation::Operation> {
         match self {
-            Operation::Create(source_status_full) => {
-                Some(store::Operation::Create(source_status_full.clone()))
-            }
+            Operation::Create(source_status_full) => Some(store::operation::Operation::Create(
+                source_status_full.clone(),
+            )),
             Operation::Update {
                 src_identifier,
                 content,
@@ -58,7 +58,7 @@ impl Operation {
             } => dst_statuses
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
-                .map(|dst| store::Operation::Update {
+                .map(|dst| store::operation::Operation::Update {
                     dst_identifier: dst.identifier.clone(),
                     content: content.clone(),
                     facets: facets.clone(),
@@ -66,7 +66,7 @@ impl Operation {
             Operation::Delete { src_identifier } => dst_statuses
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
-                .map(|dst| store::Operation::Delete {
+                .map(|dst| store::operation::Operation::Delete {
                     dst_identifier: dst.identifier.clone(),
                 }),
         }
@@ -88,7 +88,7 @@ async fn fetch_statuses(
 fn create_store_operations(
     operations: &[Operation],
     dst_statuses: &[store::user::DestinationStatus],
-) -> Vec<store::Operation> {
+) -> Vec<store::operation::Operation> {
     operations
         .iter()
         .filter_map(|operation| operation.to_store(dst_statuses))
