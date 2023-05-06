@@ -91,17 +91,6 @@ async fn fetch_statuses(
     Ok((statuses, operations))
 }
 
-fn create_store_operations(
-    operations: &[Operation],
-    account_pair: &store::operation::AccountPair,
-    dst_statuses: &[store::user::DestinationStatus],
-) -> Vec<store::operation::Operation> {
-    operations
-        .iter()
-        .filter_map(|operation| operation.to_store(account_pair.clone(), dst_statuses))
-        .collect()
-}
-
 fn has_users_operations(operations: &[store::operation::Operation], src_key: &AccountKey) -> bool {
     operations
         .iter()
@@ -109,23 +98,29 @@ fn has_users_operations(operations: &[store::operation::Operation], src_key: &Ac
 }
 
 fn to_store_operations(
-    stored_user: &mut store::user::User,
-    src_account_key: &AccountKey,
-    dst_account_keys: impl Iterator<Item = AccountKey>,
+    dst_clients: &[Box<dyn Client>],
     operations: &[Operation],
+    stored_user: &store::user::User,
+    src_account_key: &AccountKey,
 ) -> Vec<store::operation::Operation> {
-    let mut vec = Vec::new();
-    for dst_account_key in dst_account_keys {
-        let dst = stored_user.get_or_create_dst(&dst_account_key);
-        let account_pair =
-            store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
-        vec.append(&mut create_store_operations(
-            operations,
-            &account_pair,
-            &dst.statuses,
-        ));
-    }
-    vec
+    let dst_account_keys = dst_clients
+        .iter()
+        .map(|dst_client| dst_client.to_account_key());
+
+    let empty = vec![];
+    dst_account_keys
+        .flat_map(|dst_account_key| {
+            let dst_statuses = stored_user
+                .find_dst(&dst_account_key)
+                .map_or_else(|| &empty, |dst| &dst.statuses);
+            let account_pair =
+                store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
+            operations
+                .iter()
+                .filter_map(|operation| operation.to_store(account_pair.clone(), dst_statuses))
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 pub async fn get(
@@ -150,11 +145,8 @@ pub async fn get(
     if !operations.is_empty() || has_users_operations {
         let dst_clients = create_clients(http_client, &config_user.dsts).await?;
         if !operations.is_empty() {
-            let dst_account_keys = dst_clients
-                .iter()
-                .map(|dst_client| dst_client.to_account_key());
             let mut new_operations =
-                to_store_operations(stored_user, &src_account_key, dst_account_keys, &operations);
+                to_store_operations(&dst_clients, &operations, &*stored_user, &src_account_key);
             store.operations.append(&mut new_operations);
         }
         dst_client_map.insert(src_client.to_account_key(), dst_clients);

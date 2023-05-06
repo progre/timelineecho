@@ -58,6 +58,12 @@ pub struct User {
 }
 
 impl User {
+    pub fn find_dst<'a>(&'a self, account_key: &AccountKey) -> Option<&'a Destination> {
+        self.dsts.iter().find(|dst| {
+            dst.origin == account_key.origin && dst.identifier == account_key.identifier
+        })
+    }
+
     pub fn get_or_create_dst<'a>(&'a mut self, account_key: &AccountKey) -> &'a mut Destination {
         let idx = self.dsts.iter().position(|dst| {
             dst.origin == account_key.origin && dst.identifier == account_key.identifier
