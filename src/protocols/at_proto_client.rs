@@ -72,6 +72,14 @@ fn to_record<'a>(
     }
 }
 
+fn uri_to_rkey(uri: &str) -> Result<String> {
+    Ok(Regex::new(r"at://did:plc:.+?/app.bsky.feed.post/(.+)")
+        .unwrap()
+        .captures(uri)
+        .ok_or_else(|| anyhow!("invalid uri format"))?[1]
+        .to_owned())
+}
+
 pub struct Client {
     api: Api,
     http_client: Arc<reqwest::Client>,
@@ -94,6 +102,16 @@ impl Client {
             identifier,
             password,
         }
+    }
+
+    async fn init_session(&mut self) -> Result<()> {
+        let session = self
+            .api
+            .server
+            .create_session(&self.http_client, &self.identifier, &self.password)
+            .await?;
+        self.session = Some(session);
+        Ok(())
     }
 
     async fn to_embed(
@@ -156,6 +174,26 @@ impl Client {
         }
         Ok(None)
     }
+
+    async fn find_reply_root(
+        &self,
+        session: &Session,
+        rkey: &str,
+    ) -> Result<Option<strong_ref::Main>> {
+        let record = self
+            .api
+            .repo
+            .get_record(&self.http_client, session, rkey)
+            .await?;
+        let atrium_api::records::Record::AppBskyFeedPost(record) = record.value else {
+            unreachable!();
+        };
+        let Some(reply) = record.reply else {
+            return Ok(None);
+        };
+
+        Ok(Some(reply.root))
+    }
 }
 
 #[async_trait(?Send)]
@@ -184,23 +222,21 @@ impl super::Client for Client {
         let session = match &self.session {
             Some(some) => some,
             None => {
-                let session = self
-                    .api
-                    .server
-                    .create_session(&self.http_client, &self.identifier, &self.password)
-                    .await?;
-                self.session = Some(session);
+                self.init_session().await?;
                 self.session.as_ref().unwrap()
             }
         };
+        let reply = if let Some(reply_identifier) = reply_identifier {
+            let parent: strong_ref::Main = serde_json::from_str(reply_identifier)?;
+            let root = self
+                .find_reply_root(session, &uri_to_rkey(&parent.uri)?)
+                .await?
+                .unwrap_or_else(|| parent.clone());
+            Some(ReplyRef { parent, root })
+        } else {
+            None
+        };
 
-        let reply: Option<ReplyRef> = reply_identifier
-            .map(|reply_identifier| -> Result<ReplyRef> {
-                let parent: strong_ref::Main = serde_json::from_str(reply_identifier)?;
-                let root: strong_ref::Main = serde_json::from_str(reply_identifier)?;
-                Ok(ReplyRef { parent, root })
-            })
-            .transpose()?;
         let embed = self.to_embed(session, images, external).await?;
         let record = to_record(content, facets, reply, embed.as_ref(), created_at);
 
@@ -219,21 +255,12 @@ impl super::Client for Client {
             .ok_or_else(|| anyhow!("uri not found"))?
             .as_str()
             .ok_or_else(|| anyhow!("uri is not string"))?;
-        let rkey = Regex::new(r"at://did:plc:.+?/app.bsky.feed.post/(.+)")
-            .unwrap()
-            .captures(uri)
-            .ok_or_else(|| anyhow!("invalid uri format"))?[1]
-            .to_owned();
+        let rkey = uri_to_rkey(uri)?;
 
         let session = match &self.session {
             Some(some) => some,
             None => {
-                let session = self
-                    .api
-                    .server
-                    .create_session(&self.http_client, &self.identifier, &self.password)
-                    .await?;
-                self.session = Some(session);
+                self.init_session().await?;
                 self.session.as_ref().unwrap()
             }
         };

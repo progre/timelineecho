@@ -1,5 +1,5 @@
 use anyhow::Result;
-use atrium_api::app::bsky::feed::post::ReplyRef;
+use atrium_api::{app::bsky::feed::post::ReplyRef, com};
 use reqwest::{header::CONTENT_TYPE, Body};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -105,13 +105,12 @@ impl Repo {
         Ok(())
     }
 
-    #[allow(unused)]
     pub async fn get_record(
         &self,
         client: &reqwest::Client,
         session: &Session,
         rkey: &str,
-    ) -> Result<Value> {
+    ) -> Result<com::atproto::repo::get_record::Output> {
         let token = &session.access_jwt;
         let lexicon_id = "com.atproto.repo.getRecord";
         let query_params = &[
