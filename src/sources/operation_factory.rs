@@ -66,7 +66,7 @@ async fn try_into_creating_status(
 pub async fn create_operations(
     http_client: &reqwest::Client,
     live_statuses: &[LiveStatus],
-    stored_statuses: &[store::SourceStatus],
+    stored_statuses: &[store::user::SourceStatus],
 ) -> Result<Vec<Operation>> {
     if live_statuses.is_empty() || stored_statuses.is_empty() {
         return Ok(vec![]);

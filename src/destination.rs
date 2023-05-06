@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::{
+    app::AccountKey,
     database::Database,
     protocols::Client,
     store::{
@@ -13,7 +14,7 @@ use crate::{
 
 fn to_dst_identifier<'a>(
     src_identifier: &str,
-    dst_statuses: &'a [store::DestinationStatus],
+    dst_statuses: &'a [store::user::DestinationStatus],
 ) -> Option<&'a str> {
     Some(
         dst_statuses
@@ -25,7 +26,7 @@ fn to_dst_identifier<'a>(
 }
 
 pub async fn post_operation(
-    stored_dst: &mut store::Destination,
+    stored_dst: &mut store::user::Destination,
     dst_client: &mut dyn Client,
     operation: store::Operation,
 ) -> Result<()> {
@@ -54,7 +55,7 @@ pub async fn post_operation(
                 .await?;
             dst_statuses.insert(
                 0,
-                store::DestinationStatus {
+                store::user::DestinationStatus {
                     identifier: dst_identifier,
                     src_identifier,
                 },
@@ -94,7 +95,7 @@ fn pop_operation(store: &mut store::Store) -> Option<(store::AccountPair, store:
 pub async fn post(
     database: &impl Database,
     store: &mut store::Store,
-    dst_clients_map: &mut HashMap<store::AccountKey, Vec<Box<dyn Client>>>,
+    dst_clients_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
     // WTF: DynamoDB の連続アクセス不能問題が解消するまで連続作業を絞る
     for _ in 0..2 {

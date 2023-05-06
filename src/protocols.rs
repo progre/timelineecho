@@ -11,11 +11,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::future::join_all;
 
-use crate::{
-    config,
-    sources::source,
-    store::{self, AccountKey},
-};
+use crate::{app::AccountKey, config, sources::source, store};
 
 #[async_trait(?Send)]
 pub trait Client {

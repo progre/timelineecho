@@ -8,6 +8,12 @@ use crate::{
     sources::source::{get, retain_all_dst_statuses},
 };
 
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct AccountKey {
+    pub origin: String,
+    pub identifier: String,
+}
+
 pub async fn app(database: &impl Database) -> Result<()> {
     let config = database.config().await?;
 

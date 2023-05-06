@@ -3,10 +3,11 @@ use std::{collections::HashMap, convert::Into, sync::Arc};
 use anyhow::Result;
 
 use crate::{
+    app::AccountKey,
     config,
     database::Database,
     protocols::{create_client, create_clients, Client},
-    store::{self, AccountKey},
+    store,
 };
 
 use super::operation_factory::create_operations;
@@ -42,7 +43,10 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn to_store(&self, dst_statuses: &[store::DestinationStatus]) -> Option<store::Operation> {
+    pub fn to_store(
+        &self,
+        dst_statuses: &[store::user::DestinationStatus],
+    ) -> Option<store::Operation> {
         match self {
             Operation::Create(source_status_full) => {
                 Some(store::Operation::Create(source_status_full.clone()))
@@ -72,8 +76,8 @@ impl Operation {
 async fn fetch_statuses(
     http_client: &reqwest::Client,
     src_client: &mut dyn Client,
-    src_statuses: &[store::SourceStatus],
-) -> Result<(Vec<store::SourceStatus>, Vec<Operation>)> {
+    src_statuses: &[store::user::SourceStatus],
+) -> Result<(Vec<store::user::SourceStatus>, Vec<Operation>)> {
     let live_statuses = src_client.fetch_statuses().await?;
 
     let operations = create_operations(http_client, &live_statuses, src_statuses).await?;
@@ -83,7 +87,7 @@ async fn fetch_statuses(
 
 fn create_store_operations(
     operations: &[Operation],
-    dst_statuses: &[store::DestinationStatus],
+    dst_statuses: &[store::user::DestinationStatus],
 ) -> Vec<store::Operation> {
     operations
         .iter()
@@ -91,7 +95,7 @@ fn create_store_operations(
         .collect()
 }
 
-fn has_users_operations(stored_user: &store::User) -> bool {
+fn has_users_operations(stored_user: &store::user::User) -> bool {
     stored_user
         .dsts
         .iter()
@@ -99,8 +103,8 @@ fn has_users_operations(stored_user: &store::User) -> bool {
 }
 
 fn update_operations(
-    stored_user: &mut store::User,
-    dst_account_keys: impl Iterator<Item = store::AccountKey>,
+    stored_user: &mut store::user::User,
+    dst_account_keys: impl Iterator<Item = AccountKey>,
     operations: &[Operation],
 ) {
     for dst_account_key in dst_account_keys {
