@@ -1,6 +1,7 @@
 use std::{collections::HashMap, convert::Into, sync::Arc};
 
 use anyhow::Result;
+use chrono::DateTime;
 
 use crate::{
     app::AccountKey,
@@ -103,18 +104,18 @@ fn to_store_operations(
     stored_user: &store::user::User,
     src_account_key: &AccountKey,
 ) -> Vec<store::operation::Operation> {
-    let dst_account_keys = dst_clients
-        .iter()
-        .map(|dst_client| dst_client.to_account_key());
-
     let empty = vec![];
-    dst_account_keys
-        .flat_map(|dst_account_key| {
+    dst_clients
+        .iter()
+        .flat_map(|dst_client| {
+            let dst_account_key = dst_client.to_account_key();
+
             let dst_statuses = stored_user
                 .find_dst(&dst_account_key)
                 .map_or_else(|| &empty, |dst| &dst.statuses);
             let account_pair =
                 store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
+
             operations
                 .iter()
                 .filter_map(|operation| operation.to_store(account_pair.clone(), dst_statuses))
@@ -161,12 +162,8 @@ fn necessary_src_identifiers(store: &store::Store) -> Vec<String> {
     store
         .users
         .iter()
-        .flat_map(|user| {
-            user.src
-                .statuses
-                .iter()
-                .map(|src_status| src_status.identifier.clone())
-        })
+        .flat_map(|user| user.src.statuses.iter())
+        .map(|src_status| src_status.identifier.clone())
         .collect()
 }
 
@@ -177,16 +174,16 @@ pub async fn retain_all_dst_statuses(
     let necessary_src_identifiers = necessary_src_identifiers(&*store);
 
     let mut updated = false;
-    for user in &mut store.users {
-        for dst in &mut user.dsts {
+    store
+        .users
+        .iter_mut()
+        .flat_map(|user| user.dsts.iter_mut())
+        .for_each(|dst| {
             let len = dst.statuses.len();
             dst.statuses
                 .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
-            if dst.statuses.len() != len {
-                updated = true;
-            }
-        }
-    }
+            updated |= dst.statuses.len() != len;
+        });
     if updated {
         database.commit(&*store).await?;
     }
