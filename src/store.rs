@@ -18,7 +18,7 @@ pub struct Store {
 }
 
 impl Store {
-    pub fn get_or_create_user<'a>(&'a mut self, account_key: &AccountKey) -> &'a mut User {
+    pub fn get_or_create_user_mut<'a>(&'a mut self, account_key: &AccountKey) -> &'a mut User {
         let idx = self.users.iter().position(|user| {
             user.src.origin == account_key.origin && user.src.identifier == account_key.identifier
         });
@@ -36,11 +36,11 @@ impl Store {
         self.users.last_mut().unwrap()
     }
 
-    pub fn get_or_create_dst<'a>(
+    pub fn get_or_create_dst_mut<'a>(
         &'a mut self,
         account_pair: &operation::AccountPair,
     ) -> &'a mut Destination {
-        self.get_or_create_user(&account_pair.to_src_key())
-            .get_or_create_dst(&account_pair.to_dst_key())
+        self.get_or_create_user_mut(&account_pair.to_src_key())
+            .get_or_create_dst_mut(&account_pair.to_dst_key())
     }
 }

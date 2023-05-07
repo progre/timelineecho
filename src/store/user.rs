@@ -64,7 +64,10 @@ impl User {
         })
     }
 
-    pub fn get_or_create_dst<'a>(&'a mut self, account_key: &AccountKey) -> &'a mut Destination {
+    pub fn get_or_create_dst_mut<'a>(
+        &'a mut self,
+        account_key: &AccountKey,
+    ) -> &'a mut Destination {
         let idx = self.dsts.iter().position(|dst| {
             dst.origin == account_key.origin && dst.identifier == account_key.identifier
         });

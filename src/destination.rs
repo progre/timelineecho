@@ -90,7 +90,7 @@ pub async fn post(
             break;
         };
 
-        let stored_dst = store.get_or_create_dst(operation.account_pair());
+        let stored_dst = store.get_or_create_dst_mut(operation.account_pair());
         let dst_client = dst_clients_map
             .get_mut(&operation.account_pair().to_src_key())
             .unwrap()

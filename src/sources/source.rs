@@ -1,7 +1,6 @@
 use std::{collections::HashMap, convert::Into, sync::Arc};
 
 use anyhow::Result;
-use chrono::DateTime;
 
 use crate::{
     app::AccountKey,
@@ -11,7 +10,7 @@ use crate::{
     store,
 };
 
-use super::operation_factory::create_operations;
+use super::{merge_operations::merge_operations, operation_factory::create_operations};
 
 #[derive(Clone)]
 pub enum LiveExternal {
@@ -98,32 +97,6 @@ fn has_users_operations(operations: &[store::operation::Operation], src_key: &Ac
         .any(|operation| &operation.account_pair().to_src_key() == src_key)
 }
 
-fn to_store_operations(
-    dst_clients: &[Box<dyn Client>],
-    operations: &[Operation],
-    stored_user: &store::user::User,
-    src_account_key: &AccountKey,
-) -> Vec<store::operation::Operation> {
-    let empty = vec![];
-    dst_clients
-        .iter()
-        .flat_map(|dst_client| {
-            let dst_account_key = dst_client.to_account_key();
-
-            let dst_statuses = stored_user
-                .find_dst(&dst_account_key)
-                .map_or_else(|| &empty, |dst| &dst.statuses);
-            let account_pair =
-                store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
-
-            operations
-                .iter()
-                .filter_map(|operation| operation.to_store(account_pair.clone(), dst_statuses))
-                .collect::<Vec<_>>()
-        })
-        .collect()
-}
-
 pub async fn get(
     database: &impl Database,
     http_client: &Arc<reqwest::Client>,
@@ -135,7 +108,7 @@ pub async fn get(
     let src_account_key = src_client.to_account_key();
 
     let has_users_operations = has_users_operations(&store.operations, &src_account_key);
-    let stored_user = store.get_or_create_user(&src_account_key);
+    let stored_user = store.get_or_create_user_mut(&src_account_key);
     let src = &mut stored_user.src;
     let initialize = src.statuses.is_empty();
 
@@ -146,9 +119,7 @@ pub async fn get(
     if !operations.is_empty() || has_users_operations {
         let dst_clients = create_clients(http_client, &config_user.dsts).await?;
         if !operations.is_empty() {
-            let mut new_operations =
-                to_store_operations(&dst_clients, &operations, &*stored_user, &src_account_key);
-            store.operations.append(&mut new_operations);
+            merge_operations(store, &dst_clients, &src_account_key, &operations);
         }
         dst_client_map.insert(src_client.to_account_key(), dst_clients);
     }
