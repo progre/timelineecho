@@ -12,13 +12,13 @@ use crate::{
     },
 };
 
-fn to_dst_identifier<'a>(
-    src_identifier: &str,
-    dst_statuses: &'a [store::user::DestinationStatus],
-) -> Option<&'a str> {
+fn to_dst_identifier<'a>(src_identifier: &str, store: &'a store::Store) -> Option<&'a str> {
     Some(
-        dst_statuses
+        store
+            .users
             .iter()
+            .flat_map(|user| &user.dsts)
+            .flat_map(|dst| &dst.statuses)
             .find(|dst| dst.src_identifier == src_identifier)?
             .identifier
             .as_str(),
@@ -26,12 +26,12 @@ fn to_dst_identifier<'a>(
 }
 
 pub async fn post_operation(
-    stored_dst: &mut store::user::Destination,
+    store: &mut store::Store,
     dst_client: &mut dyn Client,
     operation: store::operation::Operation,
 ) -> Result<()> {
     match operation {
-        Create(content) => {
+        Create(create) => {
             let store::operation::CreatingStatus {
                 src_identifier,
                 content,
@@ -40,10 +40,9 @@ pub async fn post_operation(
                 media,
                 external,
                 created_at,
-            } = content.status;
-            let dst_statuses = &mut stored_dst.statuses;
-            let reply_identifier = reply_src_identifier
-                .and_then(|reply| to_dst_identifier(&reply, dst_statuses.as_ref()));
+            } = create.status;
+            let reply_identifier =
+                reply_src_identifier.and_then(|reply| to_dst_identifier(&reply, &*store));
             let dst_identifier = dst_client
                 .post(
                     &content,
@@ -54,13 +53,16 @@ pub async fn post_operation(
                     &created_at,
                 )
                 .await?;
-            dst_statuses.insert(
-                0,
-                store::user::DestinationStatus {
-                    identifier: dst_identifier,
-                    src_identifier,
-                },
-            );
+            store
+                .get_or_create_dst_mut(&create.account_pair)
+                .statuses
+                .insert(
+                    0,
+                    store::user::DestinationStatus {
+                        identifier: dst_identifier,
+                        src_identifier,
+                    },
+                );
         }
         Update {
             account_pair: _,
@@ -90,7 +92,6 @@ pub async fn post(
             break;
         };
 
-        let stored_dst = store.get_or_create_dst_mut(operation.account_pair());
         let dst_client = dst_clients_map
             .get_mut(&operation.account_pair().to_src_key())
             .unwrap()
@@ -98,7 +99,7 @@ pub async fn post(
             .find(|dst_client| dst_client.to_account_key() == operation.account_pair().to_dst_key())
             .unwrap();
 
-        post_operation(stored_dst, dst_client.as_mut(), operation).await?;
+        post_operation(store, dst_client.as_mut(), operation).await?;
         database.commit(store).await?;
     }
 
