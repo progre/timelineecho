@@ -141,8 +141,6 @@ impl super::Client for Client {
                     created_at: status.created_at.to_rfc3339(),
                 }
             })
-            .rev()
-            .rev()
             .collect();
 
         Ok(statuses)
