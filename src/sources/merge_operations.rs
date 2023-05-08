@@ -13,24 +13,19 @@ use crate::{
 fn to_store_operations(
     dst_clients: &[Box<dyn Client>],
     operations: &[Operation],
-    stored_user: &store::user::User,
     src_account_key: &AccountKey,
 ) -> Vec<store::operations::Operation> {
-    let empty = vec![];
     dst_clients
         .iter()
         .flat_map(|dst_client| {
             let dst_account_key = dst_client.to_account_key();
 
-            let dst_statuses = stored_user
-                .find_dst(&dst_account_key)
-                .map_or_else(|| &empty, |dst| &dst.statuses);
             let account_pair =
                 store::operations::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
 
             operations
                 .iter()
-                .filter_map(|operation| operation.to_store(account_pair.clone(), dst_statuses))
+                .map(|operation| operation.to_store(account_pair.clone()))
                 .collect::<Vec<_>>()
         })
         .collect()
@@ -43,13 +38,13 @@ fn sort_operations(operations: &mut [store::operations::Operation]) {
             .timestamp_micros(),
         Update(store::operations::UpdateOperation {
             account_pair: _,
-            dst_identifier: _,
+            src_identifier: _,
             content: _,
             facets: _,
         })
         | Delete(store::operations::DeleteOperation {
             account_pair: _,
-            dst_identifier: _,
+            src_identifier: _,
         }) => i64::MAX,
     });
 }
@@ -90,12 +85,7 @@ pub fn merge_operations(
     src_account_key: &AccountKey,
     src_operations: &[Operation],
 ) {
-    let mut new_operations = to_store_operations(
-        dst_clients,
-        src_operations,
-        &*store.get_or_create_user_mut(src_account_key),
-        src_account_key,
-    );
+    let mut new_operations = to_store_operations(dst_clients, src_operations, src_account_key);
 
     let operations = &mut store.operations;
 
@@ -116,13 +106,13 @@ pub fn merge_operations(
                 }
                 Update(store::operations::UpdateOperation {
                     account_pair: _,
-                    dst_identifier: _,
+                    src_identifier: _,
                     content: _,
                     facets: _,
                 })
                 | Delete(store::operations::DeleteOperation {
                     account_pair: _,
-                    dst_identifier: _,
+                    src_identifier: _,
                 }) => true,
             });
         });

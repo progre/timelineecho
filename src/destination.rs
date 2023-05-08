@@ -66,15 +66,17 @@ pub async fn post_operation(
         }
         Update(store::operations::UpdateOperation {
             account_pair: _,
-            dst_identifier: _,
+            src_identifier: _,
             content: _,
             facets: _,
         }) => todo!(),
         Delete(store::operations::DeleteOperation {
             account_pair: _,
-            dst_identifier,
+            src_identifier,
         }) => {
-            dst_client.delete(&dst_identifier).await?;
+            if let Some(dst_identifier) = to_dst_identifier(&src_identifier, &*store) {
+                dst_client.delete(dst_identifier).await?;
+            }
         }
     }
 

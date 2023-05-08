@@ -55,39 +55,30 @@ impl Operation {
     pub fn to_store(
         &self,
         account_pair: store::operations::AccountPair,
-        dst_statuses: &[store::user::DestinationStatus],
-    ) -> Option<store::operations::Operation> {
+    ) -> store::operations::Operation {
         match self {
-            Operation::Create(CreateOperation(source_status_full)) => Some(
+            Operation::Create(CreateOperation(source_status_full)) => {
                 store::operations::Operation::Create(store::operations::CreateOperation {
                     account_pair,
                     status: source_status_full.clone(),
-                }),
-            ),
+                })
+            }
             Operation::Update(UpdateOperation {
                 src_identifier,
                 content,
                 facets,
-            }) => dst_statuses
-                .iter()
-                .find(|dst| &dst.src_identifier == src_identifier)
-                .map(|dst| {
-                    Update(store::operations::UpdateOperation {
-                        account_pair,
-                        dst_identifier: dst.identifier.clone(),
-                        content: content.clone(),
-                        facets: facets.clone(),
-                    })
-                }),
-            Operation::Delete(DeleteOperation { src_identifier }) => dst_statuses
-                .iter()
-                .find(|dst| &dst.src_identifier == src_identifier)
-                .map(|dst| {
-                    Delete(store::operations::DeleteOperation {
-                        account_pair,
-                        dst_identifier: dst.identifier.clone(),
-                    })
-                }),
+            }) => Update(store::operations::UpdateOperation {
+                account_pair,
+                src_identifier: src_identifier.clone(),
+                content: content.clone(),
+                facets: facets.clone(),
+            }),
+            Operation::Delete(DeleteOperation { src_identifier }) => {
+                Delete(store::operations::DeleteOperation {
+                    account_pair,
+                    src_identifier: src_identifier.clone(),
+                })
+            }
         }
     }
 }

@@ -32,7 +32,9 @@ pub async fn app(database: &impl Database) -> Result<()> {
         .await?;
     }
     post(database, &mut store, &mut dst_client_map).await?;
-    retain_all_dst_statuses(database, &mut store).await?;
+    if store.operations.is_empty() {
+        retain_all_dst_statuses(database, &mut store).await?;
+    }
 
     Ok(())
 }

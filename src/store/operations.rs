@@ -98,7 +98,7 @@ pub struct CreateOperation {
 pub struct UpdateOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
-    pub dst_identifier: String,
+    pub src_identifier: String,
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub facets: Vec<Facet>,
@@ -109,7 +109,7 @@ pub struct UpdateOperation {
 pub struct DeleteOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
-    pub dst_identifier: String,
+    pub src_identifier: String,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -127,13 +127,13 @@ impl Operation {
             Operation::Create(content) => &content.account_pair,
             Operation::Update(UpdateOperation {
                 account_pair,
-                dst_identifier: _,
+                src_identifier: _,
                 content: _,
                 facets: _,
             })
             | Operation::Delete(DeleteOperation {
                 account_pair,
-                dst_identifier: _,
+                src_identifier: _,
             }) => account_pair,
         }
     }
