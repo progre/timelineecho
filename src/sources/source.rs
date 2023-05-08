@@ -33,16 +33,22 @@ pub struct LiveStatus {
     pub created_at: String,
 }
 
+pub struct CreateOperation(pub store::operations::CreatingStatus);
+
+pub struct UpdateOperation {
+    pub src_identifier: String,
+    pub content: String,
+    pub facets: Vec<store::operations::Facet>,
+}
+
+pub struct DeleteOperation {
+    pub src_identifier: String,
+}
+
 pub enum Operation {
-    Create(store::operations::CreatingStatus),
-    Update {
-        src_identifier: String,
-        content: String,
-        facets: Vec<store::operations::Facet>,
-    },
-    Delete {
-        src_identifier: String,
-    },
+    Create(CreateOperation),
+    Update(UpdateOperation),
+    Delete(DeleteOperation),
 }
 
 impl Operation {
@@ -52,17 +58,17 @@ impl Operation {
         dst_statuses: &[store::user::DestinationStatus],
     ) -> Option<store::operations::Operation> {
         match self {
-            Operation::Create(source_status_full) => Some(store::operations::Operation::Create(
-                store::operations::CreateOperation {
+            Operation::Create(CreateOperation(source_status_full)) => Some(
+                store::operations::Operation::Create(store::operations::CreateOperation {
                     account_pair,
                     status: source_status_full.clone(),
-                },
-            )),
-            Operation::Update {
+                }),
+            ),
+            Operation::Update(UpdateOperation {
                 src_identifier,
                 content,
                 facets,
-            } => dst_statuses
+            }) => dst_statuses
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| {
@@ -73,7 +79,7 @@ impl Operation {
                         facets: facets.clone(),
                     })
                 }),
-            Operation::Delete { src_identifier } => dst_statuses
+            Operation::Delete(DeleteOperation { src_identifier }) => dst_statuses
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
                 .map(|dst| {

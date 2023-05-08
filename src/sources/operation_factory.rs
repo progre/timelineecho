@@ -4,7 +4,9 @@ use tracing::warn;
 
 use crate::store::{self, operations::Facet::Link};
 
-use super::source::{LiveExternal, LiveStatus, Operation};
+use super::source::{
+    CreateOperation, DeleteOperation, LiveExternal, LiveStatus, Operation, UpdateOperation,
+};
 
 async fn fetch_html(http_client: &reqwest::Client, uri: String) -> Result<webpage::HTML> {
     let text = http_client
@@ -80,9 +82,9 @@ pub async fn create_operations(
         .iter()
         .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
         .map(|status| async {
-            Ok(Operation::Create(
+            Ok(Operation::Create(CreateOperation(
                 try_into_creating_status(status.clone(), http_client).await?,
-            ))
+            )))
         });
     let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
     // UD
@@ -96,16 +98,16 @@ pub async fn create_operations(
         .filter(|stored| &stored.identifier >= since_id)
         .filter_map(|stored| {
             let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
-                return Some(Operation::Delete {
+                return Some(Operation::Delete(DeleteOperation {
                     src_identifier: stored.identifier.clone(),
-                });
+                }));
             };
             if live.content != stored.content {
-                return Some(Operation::Update {
+                return Some(Operation::Update(UpdateOperation {
                     src_identifier: live.identifier.clone(),
                     content: live.content.clone(),
                     facets: live.facets.clone(),
-                });
+                }));
             }
             None
         });

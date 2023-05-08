@@ -1,6 +1,6 @@
 use chrono::DateTime;
 
-use super::source::Operation;
+use super::source::{DeleteOperation, Operation, UpdateOperation};
 use crate::{
     app::AccountKey,
     protocols::Client,
@@ -56,24 +56,24 @@ fn sort_operations(operations: &mut [store::operations::Operation]) {
 
 fn to_update_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
     match src_operation {
-        Operation::Create(_) | Operation::Delete { src_identifier: _ } => None,
-        Operation::Update {
+        Operation::Create(_) | Operation::Delete(DeleteOperation { src_identifier: _ }) => None,
+        Operation::Update(UpdateOperation {
             src_identifier,
             content: _,
             facets: _,
-        } => Some(src_identifier),
+        }) => Some(src_identifier),
     }
 }
 
 fn to_delete_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
     match src_operation {
         Operation::Create(_)
-        | Operation::Update {
+        | Operation::Update(UpdateOperation {
             src_identifier: _,
             content: _,
             facets: _,
-        } => None,
-        Operation::Delete { src_identifier } => Some(src_identifier),
+        }) => None,
+        Operation::Delete(DeleteOperation { src_identifier }) => Some(src_identifier),
     }
 }
 
