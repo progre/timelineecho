@@ -27,14 +27,14 @@ fn trace_header(header: &HeaderMap) {
         });
 }
 
-fn link(current_idx: usize, uri: &str) -> store::operation::Facet {
-    store::operation::Facet::Link {
+fn link(current_idx: usize, uri: &str) -> store::operations::Facet {
+    store::operations::Facet::Link {
         byte_slice: (current_idx as u32)..(current_idx as u32) + (uri.as_bytes().len() as u32),
         uri: uri.to_owned(),
     }
 }
 
-fn html_to_content_facets(html: &str) -> (String, Vec<store::operation::Facet>) {
+fn html_to_content_facets(html: &str) -> (String, Vec<store::operations::Facet>) {
     let content = html2text::from_read_rich(html.as_bytes(), usize::MAX);
     let mut text = String::new();
     let mut facets = Vec::new();
@@ -122,7 +122,7 @@ impl super::Client for Client {
                     media: status
                         .media_attachments
                         .into_iter()
-                        .map(|media| store::operation::Medium {
+                        .map(|media| store::operations::Medium {
                             url: media.url,
                             alt: media.description.unwrap_or_default(),
                         })
@@ -130,7 +130,7 @@ impl super::Client for Client {
                     external: status.card.map_or_else(
                         || source::LiveExternal::None,
                         |card| {
-                            source::LiveExternal::Some(store::operation::External {
+                            source::LiveExternal::Some(store::operations::External {
                                 uri: card.url,
                                 title: card.title,
                                 description: card.description,
@@ -152,10 +152,10 @@ impl super::Client for Client {
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::operation::Facet],
+        facets: &[store::operations::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::operation::Medium>,
-        external: Option<store::operation::External>,
+        images: Vec<store::operations::Medium>,
+        external: Option<store::operations::External>,
         created_at: &str,
     ) -> Result<String> {
         todo!();

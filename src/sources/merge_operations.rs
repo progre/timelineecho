@@ -1,14 +1,21 @@
 use chrono::DateTime;
 
 use super::source::Operation;
-use crate::{app::AccountKey, protocols::Client, store};
+use crate::{
+    app::AccountKey,
+    protocols::Client,
+    store::{
+        self,
+        operations::Operation::{Create, Delete, Update},
+    },
+};
 
 fn to_store_operations(
     dst_clients: &[Box<dyn Client>],
     operations: &[Operation],
     stored_user: &store::user::User,
     src_account_key: &AccountKey,
-) -> Vec<store::operation::Operation> {
+) -> Vec<store::operations::Operation> {
     let empty = vec![];
     dst_clients
         .iter()
@@ -19,7 +26,7 @@ fn to_store_operations(
                 .find_dst(&dst_account_key)
                 .map_or_else(|| &empty, |dst| &dst.statuses);
             let account_pair =
-                store::operation::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
+                store::operations::AccountPair::from_keys(src_account_key.clone(), dst_account_key);
 
             operations
                 .iter()
@@ -29,23 +36,21 @@ fn to_store_operations(
         .collect()
 }
 
-fn sort_operations(operations: &mut [store::operation::Operation]) {
+fn sort_operations(operations: &mut [store::operations::Operation]) {
     operations.sort_by_key(|operation| match operation {
-        store::operation::Operation::Create(content) => {
-            -DateTime::parse_from_rfc3339(&content.status.created_at)
-                .unwrap()
-                .timestamp_micros()
-        }
-        store::operation::Operation::Update {
+        Create(content) => -DateTime::parse_from_rfc3339(&content.status.created_at)
+            .unwrap()
+            .timestamp_micros(),
+        Update(store::operations::UpdateOperation {
             account_pair: _,
             dst_identifier: _,
             content: _,
             facets: _,
-        }
-        | store::operation::Operation::Delete {
+        })
+        | Delete(store::operations::DeleteOperation {
             account_pair: _,
             dst_identifier: _,
-        } => i64::MAX,
+        }) => i64::MAX,
     });
 }
 
@@ -72,7 +77,7 @@ fn to_delete_operation_src_identifier(src_operation: &Operation) -> Option<&str>
     }
 }
 
-fn operation_target_state(content: &store::operation::Create) -> (AccountKey, &str) {
+fn operation_target_state(content: &store::operations::CreateOperation) -> (AccountKey, &str) {
     (
         content.account_pair.to_src_key(),
         &content.status.src_identifier,
@@ -105,20 +110,20 @@ pub fn merge_operations(
         .filter_map(to_delete_operation_src_identifier)
         .for_each(|deleting_status_src_identifier| {
             operations.retain(|dst_operation| match dst_operation {
-                store::operation::Operation::Create(content) => {
+                Create(content) => {
                     operation_target_state(content)
                         != (src_account_key.clone(), deleting_status_src_identifier)
                 }
-                store::operation::Operation::Update {
+                Update(store::operations::UpdateOperation {
                     account_pair: _,
                     dst_identifier: _,
                     content: _,
                     facets: _,
-                }
-                | store::operation::Operation::Delete {
+                })
+                | Delete(store::operations::DeleteOperation {
                     account_pair: _,
                     dst_identifier: _,
-                } => true,
+                }) => true,
             });
         });
     operations.append(&mut new_operations);

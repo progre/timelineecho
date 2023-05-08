@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use atrium_api::{app::bsky::feed::post::ReplyRef, com::atproto::repo::strong_ref};
+use atrium_api::{app, com};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
 use serde_json::{json, Value};
 
 use crate::{
     sources::source,
-    store::{self, operation::Facet::Link},
+    store::{self, operations::Facet::Link},
 };
 
 use super::at_proto::{
@@ -19,8 +19,8 @@ use super::at_proto::{
 
 fn to_record<'a>(
     text: &'a str,
-    facets: &'a [store::operation::Facet],
-    reply: Option<ReplyRef>,
+    facets: &'a [store::operations::Facet],
+    reply: Option<app::bsky::feed::post::ReplyRef>,
     embed: Option<&'a Embed>,
     created_at: &'a str,
 ) -> Record<'a> {
@@ -117,8 +117,8 @@ impl Client {
     async fn to_embed(
         &self,
         session: &Session,
-        images: Vec<store::operation::Medium>,
-        external: Option<store::operation::External>,
+        images: Vec<store::operations::Medium>,
+        external: Option<store::operations::External>,
     ) -> Result<Option<Embed>> {
         if !images.is_empty() {
             let mut array = Vec::new();
@@ -179,7 +179,7 @@ impl Client {
         &self,
         session: &Session,
         rkey: &str,
-    ) -> Result<Option<strong_ref::Main>> {
+    ) -> Result<Option<com::atproto::repo::strong_ref::Main>> {
         let record = self
             .api
             .repo
@@ -213,10 +213,10 @@ impl super::Client for Client {
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::operation::Facet],
+        facets: &[store::operations::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::operation::Medium>,
-        external: Option<store::operation::External>,
+        images: Vec<store::operations::Medium>,
+        external: Option<store::operations::External>,
         created_at: &str,
     ) -> Result<String> {
         let session = match &self.session {
@@ -227,12 +227,13 @@ impl super::Client for Client {
             }
         };
         let reply = if let Some(reply_identifier) = reply_identifier {
-            let parent: strong_ref::Main = serde_json::from_str(reply_identifier)?;
+            let parent: com::atproto::repo::strong_ref::Main =
+                serde_json::from_str(reply_identifier)?;
             let root = self
                 .find_reply_root(session, &uri_to_rkey(&parent.uri)?)
                 .await?
                 .unwrap_or_else(|| parent.clone());
-            Some(ReplyRef { parent, root })
+            Some(app::bsky::feed::post::ReplyRef { parent, root })
         } else {
             None
         };

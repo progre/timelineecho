@@ -7,14 +7,17 @@ use crate::{
     config,
     database::Database,
     protocols::{create_client, create_clients, Client},
-    store,
+    store::{
+        self,
+        operations::Operation::{Delete, Update},
+    },
 };
 
 use super::{merge_operations::merge_operations, operation_factory::create_operations};
 
 #[derive(Clone)]
 pub enum LiveExternal {
-    Some(store::operation::External),
+    Some(store::operations::External),
     None,
     Unknown,
 }
@@ -23,19 +26,19 @@ pub enum LiveExternal {
 pub struct LiveStatus {
     pub identifier: String,
     pub content: String,
-    pub facets: Vec<store::operation::Facet>,
+    pub facets: Vec<store::operations::Facet>,
     pub reply_src_identifier: Option<String>,
-    pub media: Vec<store::operation::Medium>,
+    pub media: Vec<store::operations::Medium>,
     pub external: LiveExternal,
     pub created_at: String,
 }
 
 pub enum Operation {
-    Create(store::operation::CreatingStatus),
+    Create(store::operations::CreatingStatus),
     Update {
         src_identifier: String,
         content: String,
-        facets: Vec<store::operation::Facet>,
+        facets: Vec<store::operations::Facet>,
     },
     Delete {
         src_identifier: String,
@@ -45,15 +48,15 @@ pub enum Operation {
 impl Operation {
     pub fn to_store(
         &self,
-        account_pair: store::operation::AccountPair,
+        account_pair: store::operations::AccountPair,
         dst_statuses: &[store::user::DestinationStatus],
-    ) -> Option<store::operation::Operation> {
+    ) -> Option<store::operations::Operation> {
         match self {
-            Operation::Create(source_status_full) => Some(store::operation::Operation::Create(
-                Box::new(store::operation::Create {
+            Operation::Create(source_status_full) => Some(store::operations::Operation::Create(
+                store::operations::CreateOperation {
                     account_pair,
                     status: source_status_full.clone(),
-                }),
+                },
             )),
             Operation::Update {
                 src_identifier,
@@ -62,18 +65,22 @@ impl Operation {
             } => dst_statuses
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
-                .map(|dst| store::operation::Operation::Update {
-                    account_pair,
-                    dst_identifier: dst.identifier.clone(),
-                    content: content.clone(),
-                    facets: facets.clone(),
+                .map(|dst| {
+                    Update(store::operations::UpdateOperation {
+                        account_pair,
+                        dst_identifier: dst.identifier.clone(),
+                        content: content.clone(),
+                        facets: facets.clone(),
+                    })
                 }),
             Operation::Delete { src_identifier } => dst_statuses
                 .iter()
                 .find(|dst| &dst.src_identifier == src_identifier)
-                .map(|dst| store::operation::Operation::Delete {
-                    account_pair,
-                    dst_identifier: dst.identifier.clone(),
+                .map(|dst| {
+                    Delete(store::operations::DeleteOperation {
+                        account_pair,
+                        dst_identifier: dst.identifier.clone(),
+                    })
                 }),
         }
     }
@@ -91,7 +98,7 @@ async fn fetch_statuses(
     Ok((statuses, operations))
 }
 
-fn has_users_operations(operations: &[store::operation::Operation], src_key: &AccountKey) -> bool {
+fn has_users_operations(operations: &[store::operations::Operation], src_key: &AccountKey) -> bool {
     operations
         .iter()
         .any(|operation| &operation.account_pair().to_src_key() == src_key)

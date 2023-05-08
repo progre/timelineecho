@@ -2,7 +2,7 @@ use anyhow::Result;
 use futures::future::join_all;
 use tracing::warn;
 
-use crate::store::{self, operation::Facet::Link};
+use crate::store::{self, operations::Facet::Link};
 
 use super::source::{LiveExternal, LiveStatus, Operation};
 
@@ -18,9 +18,9 @@ async fn fetch_html(http_client: &reqwest::Client, uri: String) -> Result<webpag
 }
 
 async fn create_external(
-    facets: &[store::operation::Facet],
+    facets: &[store::operations::Facet],
     http_client: &reqwest::Client,
-) -> Result<Option<store::operation::External>> {
+) -> Result<Option<store::operations::External>> {
     for facet in facets {
         match facet {
             Link { byte_slice: _, uri } => {
@@ -31,7 +31,7 @@ async fn create_external(
                         continue;
                     }
                 };
-                return Ok(Some(store::operation::External {
+                return Ok(Some(store::operations::External {
                     uri: uri.clone(),
                     title: html.title.unwrap_or_default(),
                     description: html.description.unwrap_or_default(),
@@ -46,13 +46,13 @@ async fn create_external(
 async fn try_into_creating_status(
     live: LiveStatus,
     http_client: &reqwest::Client,
-) -> Result<store::operation::CreatingStatus> {
+) -> Result<store::operations::CreatingStatus> {
     let external = match live.external {
         LiveExternal::Some(external) => Some(external),
         LiveExternal::None => None,
         LiveExternal::Unknown => create_external(&live.facets, http_client).await?,
     };
-    Ok(store::operation::CreatingStatus {
+    Ok(store::operations::CreatingStatus {
         src_identifier: live.identifier,
         content: live.content,
         facets: live.facets,

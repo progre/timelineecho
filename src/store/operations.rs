@@ -86,7 +86,7 @@ pub struct CreatingStatus {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct Create {
+pub struct CreateOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
     #[serde(flatten)]
@@ -95,41 +95,46 @@ pub struct Create {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateOperation {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    pub dst_identifier: String,
+    pub content: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub facets: Vec<Facet>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteOperation {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    pub dst_identifier: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "operation")]
 pub enum Operation {
-    #[serde(rename_all = "camelCase")]
-    Create(Box<Create>),
-    #[serde(rename_all = "camelCase")]
-    Update {
-        #[serde(flatten)]
-        account_pair: AccountPair,
-        dst_identifier: String,
-        content: String,
-        #[serde(skip_serializing_if = "Vec::is_empty")]
-        facets: Vec<Facet>,
-    },
-    #[serde(rename_all = "camelCase")]
-    Delete {
-        #[serde(flatten)]
-        account_pair: AccountPair,
-        dst_identifier: String,
-    },
+    Create(CreateOperation),
+    Update(UpdateOperation),
+    Delete(DeleteOperation),
 }
 
 impl Operation {
     pub fn account_pair(&self) -> &AccountPair {
         match self {
             Operation::Create(content) => &content.account_pair,
-            Operation::Update {
+            Operation::Update(UpdateOperation {
                 account_pair,
                 dst_identifier: _,
                 content: _,
                 facets: _,
-            }
-            | Operation::Delete {
+            })
+            | Operation::Delete(DeleteOperation {
                 account_pair,
                 dst_identifier: _,
-            } => account_pair,
+            }) => account_pair,
         }
     }
 }

@@ -30,10 +30,10 @@ pub trait Client {
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::operation::Facet],
+        facets: &[store::operations::Facet],
         reply_identifier: Option<&str>,
-        images: Vec<store::operation::Medium>,
-        external: Option<store::operation::External>,
+        images: Vec<store::operations::Medium>,
+        external: Option<store::operations::External>,
         created_at: &str,
     ) -> Result<String>;
 

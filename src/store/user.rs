@@ -9,8 +9,8 @@ pub struct SourceStatus {
     pub content: String,
 }
 
-impl From<super::operation::CreatingStatus> for SourceStatus {
-    fn from(full: super::operation::CreatingStatus) -> Self {
+impl From<super::operations::CreatingStatus> for SourceStatus {
+    fn from(full: super::operations::CreatingStatus) -> Self {
         SourceStatus {
             identifier: full.src_identifier,
             content: full.content,

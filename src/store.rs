@@ -1,4 +1,4 @@
-pub mod operation;
+pub mod operations;
 pub mod user;
 
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::app::AccountKey;
 
 use self::{
-    operation::Operation,
+    operations::{AccountPair, Operation},
     user::{Destination, Source, User},
 };
 
@@ -38,7 +38,7 @@ impl Store {
 
     pub fn get_or_create_dst_mut<'a>(
         &'a mut self,
-        account_pair: &operation::AccountPair,
+        account_pair: &AccountPair,
     ) -> &'a mut Destination {
         self.get_or_create_user_mut(&account_pair.to_src_key())
             .get_or_create_dst_mut(&account_pair.to_dst_key())

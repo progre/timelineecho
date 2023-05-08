@@ -79,8 +79,8 @@ dependencies = [
 
 [[package]]
 name = "atrium-api"
-version = "0.1.0"
-source = "git+https://github.com/sugyan/atrium?rev=01c3d2064a091bf7b38bb854a1acea2a75ee79aa#01c3d2064a091bf7b38bb854a1acea2a75ee79aa"
+version = "0.1.1"
+source = "git+https://github.com/sugyan/atrium?rev=3044a46b5c38f9ef4930e80bc0aee3971d30fdeb#3044a46b5c38f9ef4930e80bc0aee3971d30fdeb"
 dependencies = [
  "async-trait",
  "http",
