@@ -130,6 +130,11 @@ impl super::Client for Client {
     }
 
     #[allow(unused)]
+    async fn repost(&mut self, identifier: &str, created_at: &str) -> Result<String> {
+        todo!();
+    }
+
+    #[allow(unused)]
     async fn delete(&mut self, identifier: &str) -> Result<()> {
         todo!();
     }

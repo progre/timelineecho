@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use atrium_api::{app, com};
+use atrium_api::{
+    app,
+    com::{self, atproto::repo::create_record::CreateRecord},
+};
 use chrono::{DateTime, FixedOffset};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
@@ -81,6 +84,42 @@ fn uri_to_rkey(uri: &str) -> Result<String> {
         .to_owned())
 }
 
+struct AtriumClient<'a> {
+    http_client: &'a reqwest::Client,
+    session: &'a Option<Session>,
+}
+
+#[async_trait::async_trait]
+impl atrium_api::xrpc::HttpClient for AtriumClient<'_> {
+    async fn send(
+        &self,
+        req: http::Request<Vec<u8>>,
+    ) -> Result<http::Response<Vec<u8>>, Box<dyn std::error::Error>> {
+        let resp = self.http_client.execute(req.try_into()?).await?;
+        let mut builder = http::Response::builder().status(resp.status());
+        for (k, v) in resp.headers() {
+            builder = builder.header(k, v);
+        }
+        builder
+            .body(resp.bytes().await?.to_vec())
+            .map_err(Into::into)
+    }
+}
+
+#[async_trait::async_trait]
+impl atrium_api::xrpc::XrpcClient for AtriumClient<'_> {
+    fn host(&self) -> &str {
+        "https://bsky.social"
+    }
+    fn auth(&self) -> Option<&str> {
+        self.session
+            .as_ref()
+            .map(|session| session.access_jwt.as_str())
+    }
+}
+
+atrium_api::impl_traits!(AtriumClient<'_>);
+
 pub struct Client {
     api: Api,
     http_client: Arc<reqwest::Client>,
@@ -102,6 +141,13 @@ impl Client {
             session: None,
             identifier,
             password,
+        }
+    }
+
+    fn as_atrium_client(&self) -> AtriumClient<'_> {
+        AtriumClient {
+            http_client: &self.http_client,
+            session: &self.session,
         }
     }
 
@@ -248,6 +294,40 @@ impl super::Client for Client {
             .create_record(&self.http_client, session, record)
             .await?;
         Ok(serde_json::to_string(&output)?)
+    }
+
+    async fn repost(&mut self, identifier: &str, created_at: &str) -> Result<String> {
+        let session = match &self.session {
+            Some(some) => some,
+            None => {
+                self.init_session().await?;
+                self.session.as_ref().unwrap()
+            }
+        };
+
+        let identifier: com::atproto::repo::create_record::Output =
+            serde_json::from_str(identifier)?;
+        let record =
+            atrium_api::records::Record::AppBskyFeedRepost(app::bsky::feed::repost::Record {
+                created_at: created_at.to_owned(),
+                subject: com::atproto::repo::strong_ref::Main {
+                    cid: identifier.cid,
+                    uri: identifier.uri,
+                },
+            });
+        let res = self
+            .as_atrium_client()
+            .create_record(com::atproto::repo::create_record::Input {
+                collection: String::from("app.bsky.feed.repost"),
+                record,
+                repo: session.did.clone(),
+                rkey: None,
+                swap_commit: None,
+                validate: None,
+            })
+            .await
+            .map_err(|err| anyhow::anyhow!("{:?}", err))?;
+        Ok(serde_json::to_string(&res)?)
     }
 
     async fn delete(&mut self, identifier: &str) -> Result<()> {

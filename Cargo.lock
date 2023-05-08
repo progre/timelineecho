@@ -2544,6 +2544,7 @@ dependencies = [
  "config",
  "futures",
  "html2text",
+ "http",
  "lambda_runtime",
  "linkify",
  "megalodon",

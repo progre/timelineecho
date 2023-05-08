@@ -38,6 +38,8 @@ pub trait Client {
         created_at: &DateTime<FixedOffset>,
     ) -> Result<String>;
 
+    async fn repost(&mut self, identifier: &str, created_at: &str) -> Result<String>;
+
     async fn delete(&mut self, identifier: &str) -> Result<()>;
 }
 

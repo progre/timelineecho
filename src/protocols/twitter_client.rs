@@ -118,6 +118,11 @@ impl super::Client for Client {
         Ok(id.to_owned())
     }
 
+    async fn repost(&mut self, identifier: &str, _created_at: &str) -> Result<String> {
+        self.api.create_retweet(&self.user_id, identifier).await?;
+        Ok(String::new())
+    }
+
     async fn delete(&mut self, identifier: &str) -> Result<()> {
         let _: Value = self.api.destroy_status(identifier).await?;
         Ok(())

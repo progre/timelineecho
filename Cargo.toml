@@ -17,6 +17,7 @@ chrono = "0.4.24"
 config = { version = "0.13.3", default-features = false, features = ["json5"] }
 futures = "0.3.28"
 html2text = "0.5.1"
+http = "0.2.9"
 lambda_runtime = "0.8.0"
 linkify = "0.9.0"
 megalodon = "0.7.0"

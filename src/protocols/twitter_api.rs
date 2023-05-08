@@ -9,7 +9,7 @@ use reqwest::{
     Body,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing::{error, event_enabled, trace, Level};
 
 fn trace_header(header: &HeaderMap) {
@@ -106,6 +106,24 @@ impl Api {
             .post(url)
             .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
             .json(&body)
+            .send()
+            .await?
+            .error_for_status()?;
+        trace_header(resp.headers());
+        Ok(resp.json().await?)
+    }
+
+    pub async fn create_retweet<T: DeserializeOwned>(
+        &self,
+        user_id: &str,
+        tweet_id: &str,
+    ) -> Result<T> {
+        let url = format!("https://api.twitter.com/2/users/{}/retweets", user_id);
+        let resp = self
+            .http_client
+            .post(&url)
+            .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
+            .json(&json!({ "tweet_id": tweet_id }))
             .send()
             .await?
             .error_for_status()?;
