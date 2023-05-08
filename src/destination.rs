@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use tracing::warn;
 
 use crate::{
     app::AccountKey,
@@ -12,11 +13,16 @@ use crate::{
     },
 };
 
-fn to_dst_identifier<'a>(src_identifier: &str, store: &'a store::Store) -> Option<&'a str> {
+fn to_dst_identifier<'a>(
+    src_origin: &str,
+    src_identifier: &str,
+    store: &'a store::Store,
+) -> Option<&'a str> {
     Some(
         store
             .users
             .iter()
+            .filter(|user| user.src.origin == src_origin)
             .flat_map(|user| &user.dsts)
             .flat_map(|dst| &dst.statuses)
             .find(|dst| dst.src_identifier == src_identifier)?
@@ -31,18 +37,21 @@ pub async fn post_operation(
     operation: store::operations::Operation,
 ) -> Result<()> {
     match operation {
-        Create(create) => {
-            let store::operations::CreatingStatus {
-                src_identifier,
-                content,
-                facets,
-                reply_src_identifier,
-                media,
-                external,
-                created_at,
-            } = create.status;
-            let reply_identifier =
-                reply_src_identifier.and_then(|reply| to_dst_identifier(&reply, &*store));
+        Create(store::operations::CreateOperation {
+            account_pair,
+            status:
+                store::operations::CreatingStatus {
+                    src_identifier,
+                    content,
+                    facets,
+                    reply_src_identifier,
+                    media,
+                    external,
+                    created_at,
+                },
+        }) => {
+            let reply_identifier = reply_src_identifier
+                .and_then(|reply| to_dst_identifier(&account_pair.src_origin, &reply, &*store));
             let dst_identifier = dst_client
                 .post(
                     &content,
@@ -53,16 +62,13 @@ pub async fn post_operation(
                     &created_at,
                 )
                 .await?;
-            store
-                .get_or_create_dst_mut(&create.account_pair)
-                .statuses
-                .insert(
-                    0,
-                    store::user::DestinationStatus {
-                        identifier: dst_identifier,
-                        src_identifier,
-                    },
-                );
+            store.get_or_create_dst_mut(&account_pair).statuses.insert(
+                0,
+                store::user::DestinationStatus {
+                    identifier: dst_identifier,
+                    src_identifier,
+                },
+            );
         }
         Update(store::operations::UpdateOperation {
             account_pair: _,
@@ -71,12 +77,14 @@ pub async fn post_operation(
             facets: _,
         }) => todo!(),
         Delete(store::operations::DeleteOperation {
-            account_pair: _,
+            account_pair,
             src_identifier,
         }) => {
-            if let Some(dst_identifier) = to_dst_identifier(&src_identifier, &*store) {
-                dst_client.delete(dst_identifier).await?;
-            }
+            let Some(dst_identifier) = to_dst_identifier(&account_pair.src_origin, &src_identifier, &*store) else {
+                warn!("dst_identifier not found (src_identifier={})", src_identifier);
+                return Ok(());
+            };
+            dst_client.delete(dst_identifier).await?;
         }
     }
 
