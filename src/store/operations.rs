@@ -70,7 +70,7 @@ pub struct External {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreatingStatus {
+pub struct CreateOperationStatus {
     pub src_identifier: String,
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -90,14 +90,12 @@ pub struct CreateOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
     #[serde(flatten)]
-    pub status: CreatingStatus,
+    pub status: CreateOperationStatus,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UpdateOperation {
-    #[serde(flatten)]
-    pub account_pair: AccountPair,
+pub struct UpdateOperationStatus {
     pub src_identifier: String,
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -106,10 +104,26 @@ pub struct UpdateOperation {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateOperation {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    #[serde(flatten)]
+    pub status: UpdateOperationStatus,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteOperationStatus {
+    pub src_identifier: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DeleteOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
-    pub src_identifier: String,
+    #[serde(flatten)]
+    pub status: DeleteOperationStatus,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -127,13 +141,11 @@ impl Operation {
             Operation::Create(content) => &content.account_pair,
             Operation::Update(UpdateOperation {
                 account_pair,
-                src_identifier: _,
-                content: _,
-                facets: _,
+                status: _,
             })
             | Operation::Delete(DeleteOperation {
                 account_pair,
-                src_identifier: _,
+                status: _,
             }) => account_pair,
         }
     }

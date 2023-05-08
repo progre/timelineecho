@@ -9,7 +9,7 @@ use crate::{
     protocols::{create_client, create_clients, Client},
     store::{
         self,
-        operations::Operation::{Delete, Update},
+        operations::Operation::{Create, Delete, Update},
     },
 };
 
@@ -33,22 +33,10 @@ pub struct LiveStatus {
     pub created_at: String,
 }
 
-pub struct CreateOperation(pub store::operations::CreatingStatus);
-
-pub struct UpdateOperation {
-    pub src_identifier: String,
-    pub content: String,
-    pub facets: Vec<store::operations::Facet>,
-}
-
-pub struct DeleteOperation {
-    pub src_identifier: String,
-}
-
 pub enum Operation {
-    Create(CreateOperation),
-    Update(UpdateOperation),
-    Delete(DeleteOperation),
+    Create(store::operations::CreateOperationStatus),
+    Update(store::operations::UpdateOperationStatus),
+    Delete(store::operations::DeleteOperationStatus),
 }
 
 impl Operation {
@@ -57,28 +45,18 @@ impl Operation {
         account_pair: store::operations::AccountPair,
     ) -> store::operations::Operation {
         match self {
-            Operation::Create(CreateOperation(source_status_full)) => {
-                store::operations::Operation::Create(store::operations::CreateOperation {
-                    account_pair,
-                    status: source_status_full.clone(),
-                })
-            }
-            Operation::Update(UpdateOperation {
-                src_identifier,
-                content,
-                facets,
-            }) => Update(store::operations::UpdateOperation {
+            Operation::Create(status) => Create(store::operations::CreateOperation {
                 account_pair,
-                src_identifier: src_identifier.clone(),
-                content: content.clone(),
-                facets: facets.clone(),
+                status: status.clone(),
             }),
-            Operation::Delete(DeleteOperation { src_identifier }) => {
-                Delete(store::operations::DeleteOperation {
-                    account_pair,
-                    src_identifier: src_identifier.clone(),
-                })
-            }
+            Operation::Update(status) => Update(store::operations::UpdateOperation {
+                account_pair,
+                status: status.clone(),
+            }),
+            Operation::Delete(status) => Delete(store::operations::DeleteOperation {
+                account_pair,
+                status: status.clone(),
+            }),
         }
     }
 }

@@ -4,9 +4,7 @@ use tracing::warn;
 
 use crate::store::{self, operations::Facet::Link};
 
-use super::source::{
-    CreateOperation, DeleteOperation, LiveExternal, LiveStatus, Operation, UpdateOperation,
-};
+use super::source::{LiveExternal, LiveStatus, Operation};
 
 async fn fetch_html(http_client: &reqwest::Client, uri: String) -> Result<webpage::HTML> {
     let text = http_client
@@ -48,13 +46,13 @@ async fn create_external(
 async fn try_into_creating_status(
     live: LiveStatus,
     http_client: &reqwest::Client,
-) -> Result<store::operations::CreatingStatus> {
+) -> Result<store::operations::CreateOperationStatus> {
     let external = match live.external {
         LiveExternal::Some(external) => Some(external),
         LiveExternal::None => None,
         LiveExternal::Unknown => create_external(&live.facets, http_client).await?,
     };
-    Ok(store::operations::CreatingStatus {
+    Ok(store::operations::CreateOperationStatus {
         src_identifier: live.identifier,
         content: live.content,
         facets: live.facets,
@@ -82,9 +80,9 @@ pub async fn create_operations(
         .iter()
         .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
         .map(|status| async {
-            Ok(Operation::Create(CreateOperation(
+            Ok(Operation::Create(
                 try_into_creating_status(status.clone(), http_client).await?,
-            )))
+            ))
         });
     let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
     // UD
@@ -98,16 +96,16 @@ pub async fn create_operations(
         .filter(|stored| &stored.identifier >= since_id)
         .filter_map(|stored| {
             let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
-                return Some(Operation::Delete(DeleteOperation {
+                return Some(Operation::Delete(store::operations::DeleteOperationStatus {
                     src_identifier: stored.identifier.clone(),
                 }));
             };
             if live.content != stored.content {
-                return Some(Operation::Update(UpdateOperation {
-                    src_identifier: live.identifier.clone(),
-                    content: live.content.clone(),
-                    facets: live.facets.clone(),
-                }));
+                return Some(Operation::Update(store::operations::UpdateOperationStatus {
+                   src_identifier: live.identifier.clone(),
+                   content: live.content.clone(),
+                   facets: live.facets.clone(),
+               }));
             }
             None
         });

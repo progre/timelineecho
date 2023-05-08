@@ -40,7 +40,7 @@ pub async fn post_operation(
         Create(store::operations::CreateOperation {
             account_pair,
             status:
-                store::operations::CreatingStatus {
+                store::operations::CreateOperationStatus {
                     src_identifier,
                     content,
                     facets,
@@ -72,13 +72,11 @@ pub async fn post_operation(
         }
         Update(store::operations::UpdateOperation {
             account_pair: _,
-            src_identifier: _,
-            content: _,
-            facets: _,
+            status: _,
         }) => todo!(),
         Delete(store::operations::DeleteOperation {
             account_pair,
-            src_identifier,
+            status: store::operations::DeleteOperationStatus { src_identifier },
         }) => {
             let Some(dst_identifier) = to_dst_identifier(&account_pair.src_origin, &src_identifier, &*store) else {
                 warn!("dst_identifier not found (src_identifier={})", src_identifier);

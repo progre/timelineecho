@@ -1,6 +1,6 @@
 use chrono::DateTime;
 
-use super::source::{DeleteOperation, Operation, UpdateOperation};
+use super::source::Operation;
 use crate::{
     app::AccountKey,
     protocols::Client,
@@ -36,23 +36,14 @@ fn sort_operations(operations: &mut [store::operations::Operation]) {
         Create(content) => -DateTime::parse_from_rfc3339(&content.status.created_at)
             .unwrap()
             .timestamp_micros(),
-        Update(store::operations::UpdateOperation {
-            account_pair: _,
-            src_identifier: _,
-            content: _,
-            facets: _,
-        })
-        | Delete(store::operations::DeleteOperation {
-            account_pair: _,
-            src_identifier: _,
-        }) => i64::MAX,
+        Update(_) | Delete(_) => i64::MAX,
     });
 }
 
 fn to_update_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
     match src_operation {
-        Operation::Create(_) | Operation::Delete(DeleteOperation { src_identifier: _ }) => None,
-        Operation::Update(UpdateOperation {
+        Operation::Create(_) | Operation::Delete(_) => None,
+        Operation::Update(store::operations::UpdateOperationStatus {
             src_identifier,
             content: _,
             facets: _,
@@ -62,13 +53,10 @@ fn to_update_operation_src_identifier(src_operation: &Operation) -> Option<&str>
 
 fn to_delete_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
     match src_operation {
-        Operation::Create(_)
-        | Operation::Update(UpdateOperation {
-            src_identifier: _,
-            content: _,
-            facets: _,
-        }) => None,
-        Operation::Delete(DeleteOperation { src_identifier }) => Some(src_identifier),
+        Operation::Create(_) | Operation::Update(_) => None,
+        Operation::Delete(store::operations::DeleteOperationStatus { src_identifier }) => {
+            Some(src_identifier)
+        }
     }
 }
 
@@ -104,16 +92,7 @@ pub fn merge_operations(
                     operation_target_state(content)
                         != (src_account_key.clone(), deleting_status_src_identifier)
                 }
-                Update(store::operations::UpdateOperation {
-                    account_pair: _,
-                    src_identifier: _,
-                    content: _,
-                    facets: _,
-                })
-                | Delete(store::operations::DeleteOperation {
-                    account_pair: _,
-                    src_identifier: _,
-                }) => true,
+                Update(_) | Delete(_) => true,
             });
         });
     operations.append(&mut new_operations);
