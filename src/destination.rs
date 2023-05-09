@@ -9,7 +9,7 @@ use crate::{
     protocols::Client,
     store::{
         self,
-        operations::Operation::{Create, Delete, Update},
+        operations::Operation::{Create, CreateRepost, Delete, Update},
     },
 };
 
@@ -69,6 +69,26 @@ pub async fn post_operation(
                     src_identifier,
                 },
             );
+        }
+        CreateRepost(store::operations::CreateRepostOperation {
+            account_pair,
+            status:
+                store::operations::CreateRepostOperationStatus {
+                    target_src_identifier,
+                    created_at,
+                },
+        }) => {
+            let Some(target_dst_identifier) = to_dst_identifier(
+                &account_pair.src_origin,
+                &target_src_identifier,
+                &*store,
+            ) else {
+                warn!("target_dst_identifier not found (target_src_identifier={})", target_src_identifier);
+                return Ok(());
+            };
+            let _dst_identifier = dst_client
+                .repost(target_dst_identifier, &created_at)
+                .await?;
         }
         Update(store::operations::UpdateOperation {
             account_pair: _,

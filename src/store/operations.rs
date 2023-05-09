@@ -97,6 +97,22 @@ pub struct CreateOperation {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CreateRepostOperationStatus {
+    pub target_src_identifier: String,
+    pub created_at: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateRepostOperation {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    #[serde(flatten)]
+    pub status: CreateRepostOperationStatus,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateOperationStatus {
     pub src_identifier: String,
     pub content: String,
@@ -133,6 +149,7 @@ pub struct DeleteOperation {
 #[serde(tag = "operation")]
 pub enum Operation {
     Create(CreateOperation),
+    CreateRepost(CreateRepostOperation),
     Update(UpdateOperation),
     Delete(DeleteOperation),
 }
@@ -140,8 +157,15 @@ pub enum Operation {
 impl Operation {
     pub fn account_pair(&self) -> &AccountPair {
         match self {
-            Operation::Create(content) => &content.account_pair,
-            Operation::Update(UpdateOperation {
+            Operation::Create(CreateOperation {
+                account_pair,
+                status: _,
+            })
+            | Operation::CreateRepost(CreateRepostOperation {
+                account_pair,
+                status: _,
+            })
+            | Operation::Update(UpdateOperation {
                 account_pair,
                 status: _,
             })
