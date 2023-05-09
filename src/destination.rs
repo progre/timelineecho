@@ -9,7 +9,7 @@ use crate::{
     protocols::Client,
     store::{
         self,
-        operations::Operation::{Create, CreateRepost, Delete, Update},
+        operations::Operation::{CreatePost, CreateRepost, DeletePost, UpdatePost},
     },
 };
 
@@ -37,10 +37,10 @@ pub async fn post_operation(
     operation: store::operations::Operation,
 ) -> Result<()> {
     match operation {
-        Create(store::operations::CreateOperation {
+        CreatePost(store::operations::CreatePostOperation {
             account_pair,
             status:
-                store::operations::CreateOperationStatus {
+                store::operations::CreatePostOperationStatus {
                     src_identifier,
                     content,
                     facets,
@@ -90,13 +90,13 @@ pub async fn post_operation(
                 .repost(target_dst_identifier, &created_at)
                 .await?;
         }
-        Update(store::operations::UpdateOperation {
+        UpdatePost(store::operations::UpdatePostOperation {
             account_pair: _,
             status: _,
         }) => todo!(),
-        Delete(store::operations::DeleteOperation {
+        DeletePost(store::operations::DeletePostOperation {
             account_pair,
-            status: store::operations::DeleteOperationStatus { src_identifier },
+            status: store::operations::DeletePostOperationStatus { src_identifier },
         }) => {
             let Some(dst_identifier) = to_dst_identifier(&account_pair.src_origin, &src_identifier, &*store) else {
                 warn!("dst_identifier not found (src_identifier={})", src_identifier);

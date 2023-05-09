@@ -46,13 +46,13 @@ async fn create_external(
 async fn try_into_creating_status(
     live: LiveStatus,
     http_client: &reqwest::Client,
-) -> Result<store::operations::CreateOperationStatus> {
+) -> Result<store::operations::CreatePostOperationStatus> {
     let external = match live.external {
         LiveExternal::Some(external) => Some(external),
         LiveExternal::None => None,
         LiveExternal::Unknown => create_external(&live.facets, http_client).await?,
     };
-    Ok(store::operations::CreateOperationStatus {
+    Ok(store::operations::CreatePostOperationStatus {
         src_identifier: live.identifier,
         content: live.content,
         facets: live.facets,
@@ -80,7 +80,7 @@ pub async fn create_operations(
         .iter()
         .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
         .map(|status| async {
-            Ok(Operation::Create(
+            Ok(Operation::CreatePost(
                 try_into_creating_status(status.clone(), http_client).await?,
             ))
         });
@@ -96,12 +96,12 @@ pub async fn create_operations(
         .filter(|stored| &stored.identifier >= since_id)
         .filter_map(|stored| {
             let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
-                return Some(Operation::Delete(store::operations::DeleteOperationStatus {
+                return Some(Operation::DeletePost(store::operations::DeletePostOperationStatus {
                     src_identifier: stored.identifier.clone(),
                 }));
             };
             if live.content != stored.content {
-                return Some(Operation::Update(store::operations::UpdateOperationStatus {
+                return Some(Operation::UpdatePost(store::operations::UpdatePostOperationStatus {
                    src_identifier: live.identifier.clone(),
                    content: live.content.clone(),
                    facets: live.facets.clone(),

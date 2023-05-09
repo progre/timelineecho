@@ -71,7 +71,7 @@ pub struct External {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateOperationStatus {
+pub struct CreatePostOperationStatus {
     pub src_identifier: String,
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -88,11 +88,11 @@ pub struct CreateOperationStatus {
 }
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct CreateOperation {
+pub struct CreatePostOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
     #[serde(flatten)]
-    pub status: CreateOperationStatus,
+    pub status: CreatePostOperationStatus,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -113,7 +113,7 @@ pub struct CreateRepostOperation {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UpdateOperationStatus {
+pub struct UpdatePostOperationStatus {
     pub src_identifier: String,
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -122,42 +122,42 @@ pub struct UpdateOperationStatus {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct UpdateOperation {
+pub struct UpdatePostOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
     #[serde(flatten)]
-    pub status: UpdateOperationStatus,
+    pub status: UpdatePostOperationStatus,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DeleteOperationStatus {
+pub struct DeletePostOperationStatus {
     pub src_identifier: String,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DeleteOperation {
+pub struct DeletePostOperation {
     #[serde(flatten)]
     pub account_pair: AccountPair,
     #[serde(flatten)]
-    pub status: DeleteOperationStatus,
+    pub status: DeletePostOperationStatus,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "operation")]
 pub enum Operation {
-    Create(CreateOperation),
+    CreatePost(CreatePostOperation),
     CreateRepost(CreateRepostOperation),
-    Update(UpdateOperation),
-    Delete(DeleteOperation),
+    UpdatePost(UpdatePostOperation),
+    DeletePost(DeletePostOperation),
 }
 
 impl Operation {
     pub fn account_pair(&self) -> &AccountPair {
         match self {
-            Operation::Create(CreateOperation {
+            Operation::CreatePost(CreatePostOperation {
                 account_pair,
                 status: _,
             })
@@ -165,11 +165,11 @@ impl Operation {
                 account_pair,
                 status: _,
             })
-            | Operation::Update(UpdateOperation {
+            | Operation::UpdatePost(UpdatePostOperation {
                 account_pair,
                 status: _,
             })
-            | Operation::Delete(DeleteOperation {
+            | Operation::DeletePost(DeletePostOperation {
                 account_pair,
                 status: _,
             }) => account_pair,

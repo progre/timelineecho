@@ -4,7 +4,7 @@ use crate::{
     protocols::Client,
     store::{
         self,
-        operations::Operation::{Create, CreateRepost, Delete, Update},
+        operations::Operation::{CreatePost, CreateRepost, DeletePost, UpdatePost},
     },
 };
 
@@ -31,15 +31,15 @@ fn to_store_operations(
 
 fn sort_operations(operations: &mut [store::operations::Operation]) {
     operations.sort_by_key(|operation| match operation {
-        Create(content) => -content.status.created_at.timestamp_micros(),
-        CreateRepost(_) | Update(_) | Delete(_) => i64::MAX,
+        CreatePost(content) => -content.status.created_at.timestamp_micros(),
+        CreateRepost(_) | UpdatePost(_) | DeletePost(_) => i64::MAX,
     });
 }
 
 fn to_update_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
     match src_operation {
-        Operation::Create(_) | Operation::CreateRepost(_) | Operation::Delete(_) => None,
-        Operation::Update(store::operations::UpdateOperationStatus {
+        Operation::CreatePost(_) | Operation::CreateRepost(_) | Operation::DeletePost(_) => None,
+        Operation::UpdatePost(store::operations::UpdatePostOperationStatus {
             src_identifier,
             content: _,
             facets: _,
@@ -49,15 +49,15 @@ fn to_update_operation_src_identifier(src_operation: &Operation) -> Option<&str>
 
 fn to_delete_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
     match src_operation {
-        Operation::Create(_) | Operation::CreateRepost(_) | Operation::Update(_) => None,
-        Operation::Delete(store::operations::DeleteOperationStatus { src_identifier }) => {
+        Operation::CreatePost(_) | Operation::CreateRepost(_) | Operation::UpdatePost(_) => None,
+        Operation::DeletePost(store::operations::DeletePostOperationStatus { src_identifier }) => {
             Some(src_identifier)
         }
     }
 }
 
 fn create_operation_target_state(
-    content: &store::operations::CreateOperation,
+    content: &store::operations::CreatePostOperation,
 ) -> (AccountKey, &str) {
     (
         content.account_pair.to_src_key(),
@@ -95,7 +95,7 @@ pub fn merge_operations(
         .filter_map(to_delete_operation_src_identifier)
         .for_each(|deleting_status_src_identifier| {
             operations.retain(|dst_operation| match dst_operation {
-                Create(content) => {
+                CreatePost(content) => {
                     create_operation_target_state(content)
                         != (src_account_key.clone(), deleting_status_src_identifier)
                 }
@@ -103,7 +103,7 @@ pub fn merge_operations(
                     create_repost_operation_target_state(content)
                         != (src_account_key.clone(), deleting_status_src_identifier)
                 }
-                Update(_) | Delete(_) => true,
+                UpdatePost(_) | DeletePost(_) => true,
             });
         });
     operations.append(&mut new_operations);

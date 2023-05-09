@@ -10,7 +10,7 @@ use crate::{
     protocols::{create_client, create_clients, Client},
     store::{
         self,
-        operations::Operation::{Create, CreateRepost, Delete, Update},
+        operations::Operation::{CreatePost, CreateRepost, DeletePost, UpdatePost},
     },
 };
 
@@ -35,10 +35,10 @@ pub struct LiveStatus {
 }
 
 pub enum Operation {
-    Create(store::operations::CreateOperationStatus),
+    CreatePost(store::operations::CreatePostOperationStatus),
     CreateRepost(store::operations::CreateRepostOperationStatus),
-    Update(store::operations::UpdateOperationStatus),
-    Delete(store::operations::DeleteOperationStatus),
+    UpdatePost(store::operations::UpdatePostOperationStatus),
+    DeletePost(store::operations::DeletePostOperationStatus),
 }
 
 impl Operation {
@@ -47,7 +47,7 @@ impl Operation {
         account_pair: store::operations::AccountPair,
     ) -> store::operations::Operation {
         match self {
-            Operation::Create(status) => Create(store::operations::CreateOperation {
+            Operation::CreatePost(status) => CreatePost(store::operations::CreatePostOperation {
                 account_pair,
                 status: status.clone(),
             }),
@@ -57,11 +57,11 @@ impl Operation {
                     status: status.clone(),
                 })
             }
-            Operation::Update(status) => Update(store::operations::UpdateOperation {
+            Operation::UpdatePost(status) => UpdatePost(store::operations::UpdatePostOperation {
                 account_pair,
                 status: status.clone(),
             }),
-            Operation::Delete(status) => Delete(store::operations::DeleteOperation {
+            Operation::DeletePost(status) => DeletePost(store::operations::DeletePostOperation {
                 account_pair,
                 status: status.clone(),
             }),
