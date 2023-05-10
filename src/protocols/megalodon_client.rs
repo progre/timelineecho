@@ -181,4 +181,9 @@ impl super::Client for Client {
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         todo!();
     }
+
+    #[allow(unused)]
+    async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
+        todo!();
+    }
 }

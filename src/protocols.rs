@@ -45,6 +45,8 @@ pub trait Client {
     ) -> Result<String>;
 
     async fn delete_post(&mut self, identifier: &str) -> Result<()>;
+
+    async fn delete_repost(&mut self, identifier: &str) -> Result<()>;
 }
 
 pub async fn create_client(

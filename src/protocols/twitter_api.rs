@@ -141,6 +141,26 @@ impl Api {
         Ok(resp.json().await?)
     }
 
+    pub async fn delete_retweet<T: DeserializeOwned>(
+        &self,
+        user_id: &str,
+        source_tweet_id: &str,
+    ) -> Result<T> {
+        let url = format!(
+            "https://api.twitter.com/2/users/{}/retweets/{}",
+            user_id, source_tweet_id
+        );
+        let resp = self
+            .http_client
+            .delete(&url)
+            .header(AUTHORIZATION, self.oauth1_request_builder.delete(url, &()))
+            .header(ACCEPT, "application/json")
+            .send()
+            .await?;
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
+        Ok(resp.json().await?)
+    }
+
     pub async fn verify_credentials<T: DeserializeOwned>(&self) -> Result<T> {
         let url = "https://api.twitter.com/1.1/account/verify_credentials.json";
         let resp = self

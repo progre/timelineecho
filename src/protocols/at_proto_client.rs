@@ -4,7 +4,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use atrium_api::{
     app,
-    com::{self, atproto::repo::create_record::CreateRecord},
+    com::{
+        self,
+        atproto::repo::{create_record::CreateRecord, delete_record::DeleteRecord},
+    },
 };
 use chrono::{DateTime, FixedOffset};
 use regex::Regex;
@@ -355,6 +358,33 @@ impl super::Client for Client {
             .repo
             .delete_record(&self.http_client, session, &rkey)
             .await?;
+        Ok(())
+    }
+
+    async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
+        let output: com::atproto::repo::put_record::Output = serde_json::from_str(identifier)?;
+        let rkey = uri_to_rkey(&output.uri)?;
+
+        let session = match &self.session {
+            Some(some) => some,
+            None => {
+                self.init_session().await?;
+                self.session.as_ref().unwrap()
+            }
+        };
+
+        let input = com::atproto::repo::delete_record::Input {
+            collection: "app.bsky.feed.repost".into(),
+            repo: session.did.clone(),
+            rkey,
+            swap_commit: None,
+            swap_record: None,
+        };
+        self.as_atrium_client()
+            .delete_record(input)
+            .await
+            .map_err(|err| anyhow::anyhow!("{:?}", err))?;
+
         Ok(())
     }
 }

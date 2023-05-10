@@ -126,11 +126,20 @@ impl super::Client for Client {
         self.api
             .create_retweet(&self.user_id, target_identifier)
             .await?;
-        Ok(String::new())
+        Ok(target_identifier.into())
     }
 
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         let _: Value = self.api.delete_tweet(identifier).await?;
+        Ok(())
+    }
+
+    async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
+        let target_identifier = identifier;
+        let _: Value = self
+            .api
+            .delete_retweet(&self.user_id, target_identifier)
+            .await?;
         Ok(())
     }
 }
