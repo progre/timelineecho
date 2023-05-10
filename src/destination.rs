@@ -74,6 +74,7 @@ pub async fn post_operation(
             account_pair,
             status:
                 store::operations::CreateRepostOperationStatus {
+                    src_identifier,
                     target_src_identifier,
                     created_at,
                 },

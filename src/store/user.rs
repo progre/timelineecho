@@ -48,12 +48,19 @@ impl From<super::operations::CreatePostOperationStatus> for SourceStatus {
 }
 
 impl From<source::LiveStatus> for SourceStatus {
-    fn from(full: source::LiveStatus) -> Self {
-        SourceStatus::Post(SourcePost {
-            identifier: full.identifier,
-            content: full.content,
-            created_at: full.created_at,
-        })
+    fn from(live: source::LiveStatus) -> Self {
+        match live {
+            source::LiveStatus::Post(post) => SourceStatus::Post(SourcePost {
+                identifier: post.identifier,
+                content: post.content,
+                created_at: post.created_at,
+            }),
+            source::LiveStatus::Repost(repost) => SourceStatus::Repost(SourceRepost {
+                identifier: repost.src_identifier,
+                target_identifier: repost.target_src_identifier,
+                created_at: repost.created_at,
+            }),
+        }
     }
 }
 

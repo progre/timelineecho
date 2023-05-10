@@ -95,7 +95,7 @@ impl super::Client for Client {
             .map(|item| {
                 let content = get_as_string_opt(item, "text")?.unwrap_or_default(); // renote のみの場合は null になる
                 let facets = create_facets(&content);
-                Ok(source::LiveStatus {
+                Ok(source::LiveStatus::Post(source::LivePost {
                     identifier: get_as_string(item, "id")?,
                     content,
                     facets,
@@ -111,7 +111,7 @@ impl super::Client for Client {
                         .collect::<Result<_>>()?,
                     external: source::LiveExternal::Unknown,
                     created_at: DateTime::parse_from_rfc3339(&get_as_string(item, "createdAt")?)?,
-                })
+                }))
             })
             .collect::<Result<_>>()?)
     }

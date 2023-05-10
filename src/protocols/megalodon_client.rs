@@ -115,7 +115,7 @@ impl super::Client for Client {
             .into_iter()
             .map(|status| {
                 let (content, facets) = html_to_content_facets(&status.content);
-                source::LiveStatus {
+                source::LiveStatus::Post(source::LivePost {
                     identifier: status.id,
                     content,
                     facets,
@@ -140,7 +140,7 @@ impl super::Client for Client {
                         },
                     ),
                     created_at: status.created_at.into(),
-                }
+                })
             })
             .collect();
 

@@ -25,7 +25,7 @@ pub enum LiveExternal {
 }
 
 #[derive(Clone)]
-pub struct LiveStatus {
+pub struct LivePost {
     pub identifier: String,
     pub content: String,
     pub facets: Vec<store::operations::Facet>,
@@ -33,6 +33,24 @@ pub struct LiveStatus {
     pub media: Vec<store::operations::Medium>,
     pub external: LiveExternal,
     pub created_at: DateTime<FixedOffset>,
+}
+
+#[derive(Clone)]
+pub enum LiveStatus {
+    Post(LivePost),
+    Repost(store::operations::CreateRepostOperationStatus),
+}
+
+impl LiveStatus {
+    pub fn created_at(&self) -> &DateTime<FixedOffset> {
+        match self {
+            LiveStatus::Post(LivePost { created_at, .. })
+            | LiveStatus::Repost(store::operations::CreateRepostOperationStatus {
+                created_at,
+                ..
+            }) => created_at,
+        }
+    }
 }
 
 pub enum Operation {
