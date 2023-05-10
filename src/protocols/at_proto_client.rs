@@ -298,7 +298,7 @@ impl super::Client for Client {
 
     async fn repost(
         &mut self,
-        identifier: &str,
+        target_identifier: &str,
         created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
         let session = match &self.session {
@@ -310,7 +310,7 @@ impl super::Client for Client {
         };
 
         let identifier: com::atproto::repo::create_record::Output =
-            serde_json::from_str(identifier)?;
+            serde_json::from_str(target_identifier)?;
         let record =
             atrium_api::records::Record::AppBskyFeedRepost(app::bsky::feed::repost::Record {
                 created_at: created_at.to_rfc3339(),

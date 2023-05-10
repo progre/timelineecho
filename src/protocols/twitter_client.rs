@@ -120,10 +120,12 @@ impl super::Client for Client {
 
     async fn repost(
         &mut self,
-        identifier: &str,
+        target_identifier: &str,
         _created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
-        self.api.create_retweet(&self.user_id, identifier).await?;
+        self.api
+            .create_retweet(&self.user_id, target_identifier)
+            .await?;
         Ok(String::new())
     }
 

@@ -40,7 +40,7 @@ pub trait Client {
 
     async fn repost(
         &mut self,
-        identifier: &str,
+        target_identifier: &str,
         created_at: &DateTime<FixedOffset>,
     ) -> Result<String>;
 

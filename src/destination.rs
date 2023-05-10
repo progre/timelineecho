@@ -87,7 +87,7 @@ pub async fn post_operation(
                 warn!("target_dst_identifier not found (target_src_identifier={})", target_src_identifier);
                 return Ok(());
             };
-            let _dst_identifier = dst_client
+            let dst_identifier = dst_client
                 .repost(target_dst_identifier, &created_at)
                 .await?;
         }
