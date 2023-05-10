@@ -103,7 +103,7 @@ pub async fn post_operation(
                 warn!("dst_identifier not found (src_identifier={})", src_identifier);
                 return Ok(());
             };
-            dst_client.delete(dst_identifier).await?;
+            dst_client.delete_post(dst_identifier).await?;
         }
     }
 

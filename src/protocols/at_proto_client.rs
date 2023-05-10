@@ -334,7 +334,7 @@ impl super::Client for Client {
         Ok(serde_json::to_string(&res)?)
     }
 
-    async fn delete(&mut self, identifier: &str) -> Result<()> {
+    async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         let json: Value = serde_json::from_str(identifier)?;
         let uri = json
             .get("uri")

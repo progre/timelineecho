@@ -127,8 +127,8 @@ impl super::Client for Client {
         Ok(String::new())
     }
 
-    async fn delete(&mut self, identifier: &str) -> Result<()> {
-        let _: Value = self.api.destroy_status(identifier).await?;
+    async fn delete_post(&mut self, identifier: &str) -> Result<()> {
+        let _: Value = self.api.delete_tweet(identifier).await?;
         Ok(())
     }
 }

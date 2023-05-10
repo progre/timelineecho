@@ -4,19 +4,24 @@ use anyhow::Result;
 use chrono::NaiveDateTime;
 use oauth1_request::{Credentials, ParameterList};
 use reqwest::{
-    header::{HeaderMap, ACCEPT, AUTHORIZATION},
+    header::{ACCEPT, AUTHORIZATION},
     multipart::{Form, Part},
-    Body,
+    Body, Response,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{json, Value};
 use tracing::{error, event_enabled, trace, Level};
 
-fn trace_header(header: &HeaderMap) {
-    if !event_enabled!(Level::TRACE) {
-        return;
+async fn trace_header_and_throw_if_error_status(resp: Response) -> Result<Response> {
+    let err = resp.error_for_status_ref().err();
+    if let Some(err) = err {
+        error!("{:?}", resp.text().await?);
+        return Err(err.into());
     }
-    header
+    if !event_enabled!(Level::TRACE) {
+        return Ok(resp);
+    }
+    resp.headers()
         .iter()
         .filter(|(key, _)| {
             [
@@ -38,6 +43,7 @@ fn trace_header(header: &HeaderMap) {
             };
             trace!("{}: {}", key, value);
         });
+    Ok(resp)
 }
 
 #[derive(Serialize)]
@@ -88,14 +94,7 @@ impl Api {
             .header(AUTHORIZATION, self.oauth1_request_builder.get(url, &()))
             .send()
             .await?;
-        trace_header(resp.headers());
-        if resp.status() != 200 {
-            let err = resp.error_for_status_ref().err().unwrap();
-            let json: Value = resp.json().await?;
-            let str = serde_json::to_string(&json)?;
-            trace!("{}", str);
-            return Err(err.into());
-        }
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
         Ok(resp.json().await?)
     }
 
@@ -107,9 +106,21 @@ impl Api {
             .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
             .json(&body)
             .send()
-            .await?
-            .error_for_status()?;
-        trace_header(resp.headers());
+            .await?;
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
+        Ok(resp.json().await?)
+    }
+
+    pub async fn delete_tweet<T: DeserializeOwned>(&self, id: &str) -> Result<T> {
+        let url = format!("https://api.twitter.com/2/tweets/{}", id);
+        let resp = self
+            .http_client
+            .delete(&url)
+            .header(AUTHORIZATION, self.oauth1_request_builder.delete(url, &()))
+            .header(ACCEPT, "application/json")
+            .send()
+            .await?;
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
         Ok(resp.json().await?)
     }
 
@@ -125,9 +136,8 @@ impl Api {
             .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
             .json(&json!({ "tweet_id": tweet_id }))
             .send()
-            .await?
-            .error_for_status()?;
-        trace_header(resp.headers());
+            .await?;
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
         Ok(resp.json().await?)
     }
 
@@ -139,32 +149,7 @@ impl Api {
             .header(AUTHORIZATION, self.oauth1_request_builder.get(url, &()))
             .send()
             .await?;
-        trace_header(resp.headers());
-        if resp.status() != 200 {
-            let err = resp.error_for_status_ref().err().unwrap();
-            let json: Value = resp.json().await?;
-            let str = serde_json::to_string(&json)?;
-            trace!("{}", str);
-            return Err(err.into());
-        }
-        Ok(resp.json().await?)
-    }
-
-    pub async fn destroy_status<T: DeserializeOwned>(&self, id: &str) -> Result<T> {
-        let url = format!("https://api.twitter.com/2/tweets/{}", id);
-        let resp = self
-            .http_client
-            .delete(&url)
-            .header(AUTHORIZATION, self.oauth1_request_builder.delete(url, &()))
-            .header(ACCEPT, "application/json")
-            .send()
-            .await?;
-        let err = resp.error_for_status_ref().err();
-        if let Some(err) = err {
-            error!("{:?}", resp.text().await?);
-            return Err(err.into());
-        }
-        trace_header(resp.headers());
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
         Ok(resp.json().await?)
     }
 
@@ -184,9 +169,8 @@ impl Api {
             .query(&query)
             .multipart(multipart)
             .send()
-            .await?
-            .error_for_status()?;
-        trace_header(resp.headers());
+            .await?;
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
         Ok(resp.json().await?)
     }
 }
