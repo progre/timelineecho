@@ -99,7 +99,8 @@ pub struct CreatePostOperation {
 #[serde(rename_all = "camelCase")]
 pub struct CreateRepostOperationStatus {
     pub target_src_identifier: String,
-    pub created_at: String,
+    #[serde(with = "format_rfc3339")]
+    pub created_at: DateTime<FixedOffset>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

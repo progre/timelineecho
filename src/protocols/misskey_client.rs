@@ -130,7 +130,11 @@ impl super::Client for Client {
     }
 
     #[allow(unused)]
-    async fn repost(&mut self, identifier: &str, created_at: &str) -> Result<String> {
+    async fn repost(
+        &mut self,
+        identifier: &str,
+        created_at: &DateTime<FixedOffset>,
+    ) -> Result<String> {
         todo!();
     }
 

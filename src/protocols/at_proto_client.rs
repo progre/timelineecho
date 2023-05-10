@@ -296,7 +296,11 @@ impl super::Client for Client {
         Ok(serde_json::to_string(&output)?)
     }
 
-    async fn repost(&mut self, identifier: &str, created_at: &str) -> Result<String> {
+    async fn repost(
+        &mut self,
+        identifier: &str,
+        created_at: &DateTime<FixedOffset>,
+    ) -> Result<String> {
         let session = match &self.session {
             Some(some) => some,
             None => {
@@ -309,7 +313,7 @@ impl super::Client for Client {
             serde_json::from_str(identifier)?;
         let record =
             atrium_api::records::Record::AppBskyFeedRepost(app::bsky::feed::repost::Record {
-                created_at: created_at.to_owned(),
+                created_at: created_at.to_rfc3339(),
                 subject: com::atproto::repo::strong_ref::Main {
                     cid: identifier.cid,
                     uri: identifier.uri,
