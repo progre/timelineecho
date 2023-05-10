@@ -1,12 +1,15 @@
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
-use crate::{app::AccountKey, sources::source};
+use crate::{app::AccountKey, sources::source, utils::format_rfc3339};
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceStatus {
     pub identifier: String,
     pub content: String,
+    #[serde(with = "format_rfc3339")]
+    pub created_at: DateTime<FixedOffset>,
 }
 
 impl From<super::operations::CreatePostOperationStatus> for SourceStatus {
@@ -14,6 +17,7 @@ impl From<super::operations::CreatePostOperationStatus> for SourceStatus {
         SourceStatus {
             identifier: full.src_identifier,
             content: full.content,
+            created_at: full.created_at,
         }
     }
 }
@@ -23,6 +27,7 @@ impl From<source::LiveStatus> for SourceStatus {
         SourceStatus {
             identifier: full.identifier,
             content: full.content,
+            created_at: full.created_at,
         }
     }
 }
