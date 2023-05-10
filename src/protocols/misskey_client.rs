@@ -93,25 +93,36 @@ impl super::Client for Client {
         Ok(root
             .iter()
             .map(|item| {
-                let content = get_as_string_opt(item, "text")?.unwrap_or_default(); // renote のみの場合は null になる
-                let facets = create_facets(&content);
-                Ok(source::LiveStatus::Post(source::LivePost {
-                    identifier: get_as_string(item, "id")?,
-                    content,
-                    facets,
-                    reply_src_identifier: get_as_string_opt(item, "replyId")?,
-                    media: get_as_array(item, "files")?
-                        .iter()
-                        .map(|file| {
-                            Ok(store::operations::Medium {
-                                url: get_as_string(file, "url")?,
-                                alt: get_as_string_opt(file, "comment")?.unwrap_or_default(),
+                let created_at = DateTime::parse_from_rfc3339(&get_as_string(item, "createdAt")?)?;
+                if let Some(renote) = item.get("renote") {
+                    Ok(source::LiveStatus::Repost(
+                        store::operations::CreateRepostOperationStatus {
+                            src_identifier: get_as_string(item, "id")?,
+                            target_src_identifier: get_as_string(renote, "id")?,
+                            created_at,
+                        },
+                    ))
+                } else {
+                    let content = get_as_string_opt(item, "text")?.unwrap_or_default(); // renote のみの場合は null になる
+                    let facets = create_facets(&content);
+                    Ok(source::LiveStatus::Post(source::LivePost {
+                        identifier: get_as_string(item, "id")?,
+                        content,
+                        facets,
+                        reply_src_identifier: get_as_string_opt(item, "replyId")?,
+                        media: get_as_array(item, "files")?
+                            .iter()
+                            .map(|file| {
+                                Ok(store::operations::Medium {
+                                    url: get_as_string(file, "url")?,
+                                    alt: get_as_string_opt(file, "comment")?.unwrap_or_default(),
+                                })
                             })
-                        })
-                        .collect::<Result<_>>()?,
-                    external: source::LiveExternal::Unknown,
-                    created_at: DateTime::parse_from_rfc3339(&get_as_string(item, "createdAt")?)?,
-                }))
+                            .collect::<Result<_>>()?,
+                        external: source::LiveExternal::Unknown,
+                        created_at,
+                    }))
+                }
             })
             .collect::<Result<_>>()?)
     }

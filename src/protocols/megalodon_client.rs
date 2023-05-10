@@ -114,33 +114,41 @@ impl super::Client for Client {
             .json()
             .into_iter()
             .map(|status| {
-                let (content, facets) = html_to_content_facets(&status.content);
-                source::LiveStatus::Post(source::LivePost {
-                    identifier: status.id,
-                    content,
-                    facets,
-                    reply_src_identifier: status.in_reply_to_id,
-                    media: status
-                        .media_attachments
-                        .into_iter()
-                        .map(|media| store::operations::Medium {
-                            url: media.url,
-                            alt: media.description.unwrap_or_default(),
-                        })
-                        .collect(),
-                    external: status.card.map_or_else(
-                        || source::LiveExternal::None,
-                        |card| {
-                            source::LiveExternal::Some(store::operations::External {
-                                uri: card.url,
-                                title: card.title,
-                                description: card.description,
-                                thumb_url: card.image,
+                if let Some(reblog) = status.reblog {
+                    source::LiveStatus::Repost(store::operations::CreateRepostOperationStatus {
+                        src_identifier: status.id,
+                        target_src_identifier: reblog.id,
+                        created_at: status.created_at.into(),
+                    })
+                } else {
+                    let (content, facets) = html_to_content_facets(&status.content);
+                    source::LiveStatus::Post(source::LivePost {
+                        identifier: status.id,
+                        content,
+                        facets,
+                        reply_src_identifier: status.in_reply_to_id,
+                        media: status
+                            .media_attachments
+                            .into_iter()
+                            .map(|media| store::operations::Medium {
+                                url: media.url,
+                                alt: media.description.unwrap_or_default(),
                             })
-                        },
-                    ),
-                    created_at: status.created_at.into(),
-                })
+                            .collect(),
+                        external: status.card.map_or_else(
+                            || source::LiveExternal::None,
+                            |card| {
+                                source::LiveExternal::Some(store::operations::External {
+                                    uri: card.url,
+                                    title: card.title,
+                                    description: card.description,
+                                    thumb_url: card.image,
+                                })
+                            },
+                        ),
+                        created_at: status.created_at.into(),
+                    })
+                }
             })
             .collect();
 
