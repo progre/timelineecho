@@ -2,7 +2,7 @@ use anyhow::Result;
 use futures::future::join_all;
 use tracing::warn;
 
-use crate::store::{self, operations::Facet::Link};
+use crate::store::{self, operations::Facet::Link, user::SourceStatus};
 
 use super::source::{LiveExternal, LiveStatus, Operation};
 
@@ -72,13 +72,15 @@ pub async fn create_operations(
         return Ok(vec![]);
     }
     // C
-    let last_id = stored_statuses
+    let last_date_time = stored_statuses
         .iter()
-        .max_by_key(|status| &status.identifier)
-        .map(|x| &x.identifier);
+        .max_by_key(|status| status.created_at())
+        .map(SourceStatus::created_at);
     let c = live_statuses
         .iter()
-        .filter(|live| last_id.map_or(true, |last_id| &live.identifier > last_id))
+        .filter(|live| {
+            last_date_time.map_or(true, |last_date_time| &live.created_at > last_date_time)
+        })
         .map(|status| async {
             Ok(Operation::CreatePost(
                 try_into_creating_status(status.clone(), http_client).await?,
@@ -86,28 +88,33 @@ pub async fn create_operations(
         });
     let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
     // UD
-    let since_id = &live_statuses
+    let since = &live_statuses
         .iter()
-        .min_by_key(|status| &status.identifier)
+        .min_by_key(|status| &status.created_at)
         .unwrap()
-        .identifier;
+        .created_at;
     let ud = stored_statuses
         .iter()
-        .filter(|stored| &stored.identifier >= since_id)
+        .filter(|stored| stored.created_at() >= since)
         .filter_map(|stored| {
-            let Some(live) = live_statuses.iter().find(|live| live.identifier == stored.identifier) else {
-                return Some(Operation::DeletePost(store::operations::DeletePostOperationStatus {
-                    src_identifier: stored.identifier.clone(),
-                }));
-            };
-            if live.content != stored.content {
-                return Some(Operation::UpdatePost(store::operations::UpdatePostOperationStatus {
-                   src_identifier: live.identifier.clone(),
-                   content: live.content.clone(),
-                   facets: live.facets.clone(),
-               }));
+            match stored {
+                store::user::SourceStatus::Post(post) => {
+                    let Some(live) = live_statuses.iter().find(|live| live.identifier == post.identifier) else {
+                        return Some(Operation::DeletePost(store::operations::DeletePostOperationStatus {
+                            src_identifier: post.identifier.clone(),
+                        }));
+                    };
+                    if live.content != post.content {
+                        return Some(Operation::UpdatePost(store::operations::UpdatePostOperationStatus {
+                           src_identifier: live.identifier.clone(),
+                           content: live.content.clone(),
+                           facets: live.facets.clone(),
+                       }));
+                    }
+                    None
+                },
+                store::user::SourceStatus::Repost(_) => None,
             }
-            None
         });
 
     Ok(c.into_iter().chain(ud).collect())

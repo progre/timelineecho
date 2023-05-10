@@ -11,6 +11,7 @@ use crate::{
     store::{
         self,
         operations::Operation::{CreatePost, CreateRepost, DeletePost, UpdatePost},
+        user::SourceStatus::{Post, Repost},
     },
 };
 
@@ -119,12 +120,18 @@ pub async fn get(
     Ok(())
 }
 
+/**
+ * src が参照している post の identifier を全て返す
+ */
 fn necessary_src_identifiers(store: &store::Store) -> Vec<String> {
     store
         .users
         .iter()
         .flat_map(|user| user.src.statuses.iter())
-        .map(|src_status| src_status.identifier.clone())
+        .map(|src_status| match src_status {
+            Post(post) => post.identifier.clone(),
+            Repost(repost) => repost.target_identifier.clone(),
+        })
         .collect()
 }
 

@@ -5,30 +5,55 @@ use crate::{app::AccountKey, sources::source, utils::format_rfc3339};
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SourceStatus {
+pub struct SourcePost {
     pub identifier: String,
     pub content: String,
     #[serde(with = "format_rfc3339")]
     pub created_at: DateTime<FixedOffset>,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceRepost {
+    pub identifier: String,
+    pub target_identifier: String,
+    #[serde(with = "format_rfc3339")]
+    pub created_at: DateTime<FixedOffset>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", untagged)]
+pub enum SourceStatus {
+    Post(SourcePost),
+    Repost(SourceRepost),
+}
+
+impl SourceStatus {
+    pub fn created_at(&self) -> &DateTime<FixedOffset> {
+        match self {
+            SourceStatus::Post(SourcePost { created_at, .. })
+            | SourceStatus::Repost(SourceRepost { created_at, .. }) => created_at,
+        }
+    }
+}
+
 impl From<super::operations::CreatePostOperationStatus> for SourceStatus {
     fn from(full: super::operations::CreatePostOperationStatus) -> Self {
-        SourceStatus {
+        SourceStatus::Post(SourcePost {
             identifier: full.src_identifier,
             content: full.content,
             created_at: full.created_at,
-        }
+        })
     }
 }
 
 impl From<source::LiveStatus> for SourceStatus {
     fn from(full: source::LiveStatus) -> Self {
-        SourceStatus {
+        SourceStatus::Post(SourcePost {
             identifier: full.identifier,
             content: full.content,
             created_at: full.created_at,
-        }
+        })
     }
 }
 
