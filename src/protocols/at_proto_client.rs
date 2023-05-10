@@ -3,6 +3,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use atrium_api::{app, com};
+use chrono::{DateTime, FixedOffset};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
 use serde_json::{json, Value};
@@ -22,7 +23,7 @@ fn to_record<'a>(
     facets: &'a [store::operations::Facet],
     reply: Option<app::bsky::feed::post::ReplyRef>,
     embed: Option<&'a Embed>,
-    created_at: &'a str,
+    created_at: &'a DateTime<FixedOffset>,
 ) -> Record<'a> {
     Record {
         text,
@@ -217,7 +218,7 @@ impl super::Client for Client {
         reply_identifier: Option<&str>,
         images: Vec<store::operations::Medium>,
         external: Option<store::operations::External>,
-        created_at: &str,
+        created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
         let session = match &self.session {
             Some(some) => some,

@@ -1,6 +1,7 @@
 use std::{collections::HashMap, convert::Into, sync::Arc};
 
 use anyhow::Result;
+use chrono::{DateTime, FixedOffset};
 
 use crate::{
     app::AccountKey,
@@ -30,7 +31,7 @@ pub struct LiveStatus {
     pub reply_src_identifier: Option<String>,
     pub media: Vec<store::operations::Medium>,
     pub external: LiveExternal,
-    pub created_at: String,
+    pub created_at: DateTime<FixedOffset>,
 }
 
 pub enum Operation {

@@ -1,8 +1,9 @@
 use std::ops::Range;
 
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 
-use crate::app::AccountKey;
+use crate::{app::AccountKey, utils::format_rfc3339};
 
 #[derive(Clone, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,7 +83,8 @@ pub struct CreateOperationStatus {
     pub media: Vec<Medium>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub external: Option<External>,
-    pub created_at: String,
+    #[serde(with = "format_rfc3339")]
+    pub created_at: DateTime<FixedOffset>,
 }
 
 #[derive(Clone, Deserialize, Serialize)]

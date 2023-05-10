@@ -7,14 +7,6 @@
 #![allow(clippy::uninlined_format_args)]
 #![allow(clippy::unreadable_literal)]
 
-use tracing_subscriber::{
-    fmt::{
-        format::{DefaultFields, Format},
-        SubscriberBuilder,
-    },
-    EnvFilter,
-};
-
 mod app;
 mod config;
 mod database;
@@ -22,6 +14,15 @@ mod destination;
 mod protocols;
 mod sources;
 mod store;
+mod utils;
+
+use tracing_subscriber::{
+    fmt::{
+        format::{DefaultFields, Format},
+        SubscriberBuilder,
+    },
+    EnvFilter,
+};
 
 fn default_subscriber_builder() -> SubscriberBuilder<DefaultFields, Format, EnvFilter> {
     tracing_subscriber::fmt().with_env_filter(

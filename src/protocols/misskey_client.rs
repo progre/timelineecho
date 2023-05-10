@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset};
 use linkify::LinkFinder;
 use serde_json::{json, Value};
 
@@ -109,7 +110,7 @@ impl super::Client for Client {
                         })
                         .collect::<Result<_>>()?,
                     external: source::LiveExternal::Unknown,
-                    created_at: get_as_string(item, "createdAt")?,
+                    created_at: DateTime::parse_from_rfc3339(&get_as_string(item, "createdAt")?)?,
                 })
             })
             .collect::<Result<_>>()?)
@@ -123,7 +124,7 @@ impl super::Client for Client {
         reply_identifier: Option<&str>,
         images: Vec<store::operations::Medium>,
         external: Option<store::operations::External>,
-        created_at: &str,
+        created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
         todo!();
     }

@@ -1,11 +1,12 @@
 use anyhow::Result;
 use atrium_api::{app::bsky::feed::post::ReplyRef, com};
+use chrono::{DateTime, FixedOffset};
 use reqwest::{header::CONTENT_TYPE, Body};
 use serde::Serialize;
 use serde_json::{json, Value};
 use tracing::error;
 
-use crate::protocols::at_proto::procedure;
+use crate::{protocols::at_proto::procedure, utils::format_rfc3339};
 
 use super::{query, Session};
 
@@ -39,7 +40,8 @@ pub struct Record<'a> {
     pub reply: Option<ReplyRef>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embed: Option<Value>,
-    pub created_at: &'a str,
+    #[serde(with = "format_rfc3339")]
+    pub created_at: &'a DateTime<FixedOffset>,
 }
 
 pub struct Repo {

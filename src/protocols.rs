@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset};
 use futures::future::join_all;
 
 use crate::{app::AccountKey, config, sources::source, store};
@@ -34,7 +35,7 @@ pub trait Client {
         reply_identifier: Option<&str>,
         images: Vec<store::operations::Medium>,
         external: Option<store::operations::External>,
-        created_at: &str,
+        created_at: &DateTime<FixedOffset>,
     ) -> Result<String>;
 
     async fn delete(&mut self, identifier: &str) -> Result<()>;

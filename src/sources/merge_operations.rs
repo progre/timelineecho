@@ -1,5 +1,3 @@
-use chrono::DateTime;
-
 use super::source::Operation;
 use crate::{
     app::AccountKey,
@@ -33,9 +31,7 @@ fn to_store_operations(
 
 fn sort_operations(operations: &mut [store::operations::Operation]) {
     operations.sort_by_key(|operation| match operation {
-        Create(content) => -DateTime::parse_from_rfc3339(&content.status.created_at)
-            .unwrap()
-            .timestamp_micros(),
+        Create(content) => -content.status.created_at.timestamp_micros(),
         Update(_) | Delete(_) => i64::MAX,
     });
 }

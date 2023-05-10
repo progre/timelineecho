@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset};
 use futures::future::join_all;
 use serde_json::{json, Value};
 
@@ -69,7 +70,7 @@ impl super::Client for Client {
         reply_identifier: Option<&str>,
         images: Vec<store::operations::Medium>,
         _external: Option<store::operations::External>,
-        _created_at: &str,
+        _created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
         let media = if images.is_empty() {
             None

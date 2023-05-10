@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset};
 use html2text::render::text_renderer::RichAnnotation;
 use megalodon::{megalodon::GetAccountStatusesInputOptions, Megalodon};
 use reqwest::header::HeaderMap;
@@ -138,7 +139,7 @@ impl super::Client for Client {
                             })
                         },
                     ),
-                    created_at: status.created_at.to_rfc3339(),
+                    created_at: status.created_at.into(),
                 }
             })
             .collect();
@@ -154,7 +155,7 @@ impl super::Client for Client {
         reply_identifier: Option<&str>,
         images: Vec<store::operations::Medium>,
         external: Option<store::operations::External>,
-        created_at: &str,
+        created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
         todo!();
     }
