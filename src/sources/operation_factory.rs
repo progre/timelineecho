@@ -2,7 +2,11 @@ use anyhow::Result;
 use futures::future::join_all;
 use tracing::warn;
 
-use crate::store::{self, operations::Facet::Link, user::SourceStatus};
+use crate::store::{
+    self,
+    operations::{DeleteRepostOperationStatus, Facet::Link},
+    user::SourceStatus,
+};
 
 use super::source::{LiveExternal, LiveStatus, Operation};
 
@@ -103,23 +107,41 @@ pub async fn create_operations(
                         LiveStatus::Repost(_) => None,
                     })
                     .find(|live| live.identifier == post.identifier);
-                let Some(live) = live else {
-                    return Some(Operation::DeletePost(store::operations::DeletePostOperationStatus {
-                        src_identifier: post.identifier.clone(),
-                    }));
-                };
-                if live.content != post.content {
-                    return Some(Operation::UpdatePost(
+                if let Some(live) = live {
+                    if live.content == post.content {
+                        return None;
+                    }
+                    Some(Operation::UpdatePost(
                         store::operations::UpdatePostOperationStatus {
                             src_identifier: live.identifier.clone(),
                             content: live.content.clone(),
                             facets: live.facets.clone(),
                         },
-                    ));
+                    ))
+                } else {
+                    Some(Operation::DeletePost(
+                        store::operations::DeletePostOperationStatus {
+                            src_identifier: post.identifier.clone(),
+                        },
+                    ))
                 }
-                None
             }
-            store::user::SourceStatus::Repost(_) => None,
+            store::user::SourceStatus::Repost(repost) => {
+                let live = live_statuses
+                    .iter()
+                    .filter_map(|live| match live {
+                        LiveStatus::Post(_) => None,
+                        LiveStatus::Repost(repost) => Some(repost),
+                    })
+                    .find(|live| live.src_identifier == repost.identifier);
+                if live.is_some() {
+                    None
+                } else {
+                    Some(Operation::DeleteRepost(DeleteRepostOperationStatus {
+                        src_identifier: repost.identifier.clone(),
+                    }))
+                }
+            }
         });
 
     Ok(c.into_iter().chain(ud).collect())

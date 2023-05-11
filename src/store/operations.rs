@@ -148,33 +148,38 @@ pub struct DeletePostOperation {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DeleteRepostOperationStatus {
+    pub src_identifier: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteRepostOperation {
+    #[serde(flatten)]
+    pub account_pair: AccountPair,
+    #[serde(flatten)]
+    pub status: DeleteRepostOperationStatus,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 #[serde(tag = "operation")]
 pub enum Operation {
     CreatePost(CreatePostOperation),
     CreateRepost(CreateRepostOperation),
     UpdatePost(UpdatePostOperation),
     DeletePost(DeletePostOperation),
+    DeleteRepost(DeleteRepostOperation),
 }
 
 impl Operation {
     pub fn account_pair(&self) -> &AccountPair {
         match self {
-            Operation::CreatePost(CreatePostOperation {
-                account_pair,
-                status: _,
-            })
-            | Operation::CreateRepost(CreateRepostOperation {
-                account_pair,
-                status: _,
-            })
-            | Operation::UpdatePost(UpdatePostOperation {
-                account_pair,
-                status: _,
-            })
-            | Operation::DeletePost(DeletePostOperation {
-                account_pair,
-                status: _,
-            }) => account_pair,
+            Operation::CreatePost(CreatePostOperation { account_pair, .. })
+            | Operation::CreateRepost(CreateRepostOperation { account_pair, .. })
+            | Operation::UpdatePost(UpdatePostOperation { account_pair, .. })
+            | Operation::DeletePost(DeletePostOperation { account_pair, .. })
+            | Operation::DeleteRepost(DeleteRepostOperation { account_pair, .. }) => account_pair,
         }
     }
 }

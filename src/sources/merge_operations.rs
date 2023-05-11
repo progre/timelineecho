@@ -4,7 +4,7 @@ use crate::{
     protocols::Client,
     store::{
         self,
-        operations::Operation::{CreatePost, CreateRepost, DeletePost, UpdatePost},
+        operations::Operation::{CreatePost, CreateRepost, DeletePost, DeleteRepost, UpdatePost},
     },
 };
 
@@ -29,30 +29,42 @@ fn to_store_operations(
         .collect()
 }
 
+/** 投稿は降順で、それ以外は末尾に積む */
 fn sort_operations(operations: &mut [store::operations::Operation]) {
     operations.sort_by_key(|operation| match operation {
         CreatePost(content) => -content.status.created_at.timestamp_micros(),
-        CreateRepost(_) | UpdatePost(_) | DeletePost(_) => i64::MAX,
+        CreateRepost(content) => -content.status.created_at.timestamp_micros(),
+        UpdatePost(_) | DeletePost(_) | DeleteRepost(_) => i64::MAX,
     });
 }
 
-fn to_update_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
-    match src_operation {
-        Operation::CreatePost(_) | Operation::CreateRepost(_) | Operation::DeletePost(_) => None,
-        Operation::UpdatePost(store::operations::UpdatePostOperationStatus {
-            src_identifier,
-            content: _,
-            facets: _,
-        }) => Some(src_identifier),
+fn to_update_post_operation_status(
+    src_operation: &Operation,
+) -> Option<&store::operations::UpdatePostOperationStatus> {
+    if let Operation::UpdatePost(status) = src_operation {
+        Some(status)
+    } else {
+        None
     }
 }
 
-fn to_delete_operation_src_identifier(src_operation: &Operation) -> Option<&str> {
-    match src_operation {
-        Operation::CreatePost(_) | Operation::CreateRepost(_) | Operation::UpdatePost(_) => None,
-        Operation::DeletePost(store::operations::DeletePostOperationStatus { src_identifier }) => {
-            Some(src_identifier)
-        }
+fn to_delete_post_operation_status(
+    src_operation: &Operation,
+) -> Option<&store::operations::DeletePostOperationStatus> {
+    if let Operation::DeletePost(status) = src_operation {
+        Some(status)
+    } else {
+        None
+    }
+}
+
+fn to_delete_repost_operation_status(
+    src_operation: &Operation,
+) -> Option<&store::operations::DeleteRepostOperationStatus> {
+    if let Operation::DeleteRepost(status) = src_operation {
+        Some(status)
+    } else {
+        None
     }
 }
 
@@ -62,15 +74,6 @@ fn create_operation_target_state(
     (
         content.account_pair.to_src_key(),
         &content.status.src_identifier,
-    )
-}
-
-fn create_repost_operation_target_state(
-    content: &store::operations::CreateRepostOperation,
-) -> (AccountKey, &str) {
-    (
-        content.account_pair.to_src_key(),
-        &content.status.target_src_identifier,
     )
 }
 
@@ -87,25 +90,45 @@ pub fn merge_operations(
     // 投稿の更新
     src_operations
         .iter()
-        .filter_map(to_update_operation_src_identifier)
+        .filter_map(to_update_post_operation_status)
         .for_each(|_| todo!("もし create が未送信なら、create を書き換える必要がある"));
     // 投稿の削除を適用
-    src_operations
+    let deleting_post_full_identifiers: Vec<_> = src_operations
         .iter()
-        .filter_map(to_delete_operation_src_identifier)
-        .for_each(|deleting_status_src_identifier| {
-            operations.retain(|dst_operation| match dst_operation {
-                CreatePost(content) => {
-                    create_operation_target_state(content)
-                        != (src_account_key.clone(), deleting_status_src_identifier)
-                }
-                CreateRepost(content) => {
-                    create_repost_operation_target_state(content)
-                        != (src_account_key.clone(), deleting_status_src_identifier)
-                }
-                UpdatePost(_) | DeletePost(_) => true,
-            });
-        });
+        .filter_map(to_delete_post_operation_status)
+        .map(|status| (src_account_key.clone(), status.src_identifier.as_str()))
+        .collect();
+    operations.retain(|dst_operation| match dst_operation {
+        CreatePost(content) => {
+            let operation_full_identifier = create_operation_target_state(content);
+            !deleting_post_full_identifiers.contains(&operation_full_identifier)
+        }
+        CreateRepost(content) => {
+            let operation_full_identifier = (
+                content.account_pair.to_src_key(),
+                content.status.target_src_identifier.as_str(),
+            );
+            !deleting_post_full_identifiers.contains(&operation_full_identifier)
+        }
+        UpdatePost(_) | DeletePost(_) | DeleteRepost(_) => true,
+    });
+    // repost の削除を適用
+    let deleting_repost_full_identifiers: Vec<_> = src_operations
+        .iter()
+        .filter_map(to_delete_repost_operation_status)
+        .map(|status| (src_account_key.clone(), status.src_identifier.as_str()))
+        .collect();
+    operations.retain(|dst_operation| match dst_operation {
+        CreateRepost(content) => {
+            let operation_full_identifier = (
+                content.account_pair.to_src_key(),
+                content.status.src_identifier.as_str(),
+            );
+            !deleting_repost_full_identifiers.contains(&operation_full_identifier)
+        }
+        CreatePost(_) | UpdatePost(_) | DeletePost(_) | DeleteRepost(_) => true,
+    });
+
     operations.append(&mut new_operations);
     sort_operations(operations);
 }

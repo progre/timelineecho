@@ -79,8 +79,16 @@ fn to_record<'a>(
     }
 }
 
-fn uri_to_rkey(uri: &str) -> Result<String> {
+fn uri_to_post_rkey(uri: &str) -> Result<String> {
     Ok(Regex::new(r"at://did:plc:.+?/app.bsky.feed.post/(.+)")
+        .unwrap()
+        .captures(uri)
+        .ok_or_else(|| anyhow!("invalid uri format"))?[1]
+        .to_owned())
+}
+
+fn uri_to_repost_rkey(uri: &str) -> Result<String> {
+    Ok(Regex::new(r"at://did:plc:.+?/app.bsky.feed.repost/(.+)")
         .unwrap()
         .captures(uri)
         .ok_or_else(|| anyhow!("invalid uri format"))?[1]
@@ -280,7 +288,7 @@ impl super::Client for Client {
             let parent: com::atproto::repo::strong_ref::Main =
                 serde_json::from_str(reply_identifier)?;
             let root = self
-                .find_reply_root(session, &uri_to_rkey(&parent.uri)?)
+                .find_reply_root(session, &uri_to_post_rkey(&parent.uri)?)
                 .await?
                 .unwrap_or_else(|| parent.clone());
             Some(app::bsky::feed::post::ReplyRef { parent, root })
@@ -341,10 +349,10 @@ impl super::Client for Client {
         let json: Value = serde_json::from_str(identifier)?;
         let uri = json
             .get("uri")
-            .ok_or_else(|| anyhow!("uri not found"))?
+            .ok_or_else(|| anyhow!("uri not found ({})", identifier))?
             .as_str()
             .ok_or_else(|| anyhow!("uri is not string"))?;
-        let rkey = uri_to_rkey(uri)?;
+        let rkey = uri_to_post_rkey(uri)?;
 
         let session = match &self.session {
             Some(some) => some,
@@ -363,7 +371,7 @@ impl super::Client for Client {
 
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let output: com::atproto::repo::put_record::Output = serde_json::from_str(identifier)?;
-        let rkey = uri_to_rkey(&output.uri)?;
+        let rkey = uri_to_repost_rkey(&output.uri)?;
 
         let session = match &self.session {
             Some(some) => some,
