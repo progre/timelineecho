@@ -4,7 +4,7 @@ use anyhow::{Ok, Result};
 
 use crate::{
     database::Database,
-    destination::post,
+    operations::destination::post,
     sources::source::{get, retain_all_dst_statuses},
 };
 
