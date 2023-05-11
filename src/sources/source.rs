@@ -141,9 +141,8 @@ pub async fn get(
 /**
  * src が参照している post の identifier を全て返す
  */
-fn necessary_src_identifiers(store: &store::Store) -> Vec<String> {
-    store
-        .users
+fn necessary_post_src_identifiers(users: &[store::user::User]) -> Vec<String> {
+    users
         .iter()
         .flat_map(|user| user.src.statuses.iter())
         .map(|src_status| match src_status {
@@ -153,11 +152,23 @@ fn necessary_src_identifiers(store: &store::Store) -> Vec<String> {
         .collect()
 }
 
+fn necessary_repost_src_identifiers(users: &[store::user::User]) -> Vec<String> {
+    users
+        .iter()
+        .flat_map(|user| user.src.statuses.iter())
+        .filter_map(|src_status| match src_status {
+            Post(_) => None,
+            Repost(repost) => Some(repost.identifier.clone()),
+        })
+        .collect()
+}
+
 pub async fn retain_all_dst_statuses(
     database: &impl Database,
     store: &mut store::Store,
 ) -> Result<()> {
-    let necessary_src_identifiers = necessary_src_identifiers(&*store);
+    let necessary_post_src_identifiers = necessary_post_src_identifiers(&store.users);
+    let necessary_repost_src_identifiers = necessary_repost_src_identifiers(&store.users);
 
     let mut updated = false;
     store
@@ -168,9 +179,11 @@ pub async fn retain_all_dst_statuses(
             let len = dst.statuses.len();
             dst.statuses.retain(|status| match status {
                 store::user::DestinationStatus::Post(post) => {
-                    necessary_src_identifiers.contains(&post.src_identifier)
+                    necessary_post_src_identifiers.contains(&post.src_identifier)
                 }
-                store::user::DestinationStatus::Repost(_) => todo!(),
+                store::user::DestinationStatus::Repost(repost) => {
+                    necessary_repost_src_identifiers.contains(&repost.src_identifier)
+                }
             });
             updated |= dst.statuses.len() != len;
         });

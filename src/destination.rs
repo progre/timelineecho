@@ -95,6 +95,13 @@ pub async fn post_operation(
             let dst_identifier = dst_client
                 .repost(target_dst_identifier, &created_at)
                 .await?;
+            store.get_or_create_dst_mut(&account_pair).statuses.insert(
+                0,
+                store::user::DestinationStatus::Repost(store::user::IdentifierPair {
+                    identifier: dst_identifier,
+                    src_identifier,
+                }),
+            );
         }
         UpdatePost(store::operations::UpdatePostOperation {
             account_pair: _,
