@@ -166,8 +166,12 @@ pub async fn retain_all_dst_statuses(
         .flat_map(|user| user.dsts.iter_mut())
         .for_each(|dst| {
             let len = dst.statuses.len();
-            dst.statuses
-                .retain(|status| necessary_src_identifiers.contains(&status.src_identifier));
+            dst.statuses.retain(|status| match status {
+                store::user::DestinationStatus::Post(post) => {
+                    necessary_src_identifiers.contains(&post.src_identifier)
+                }
+                store::user::DestinationStatus::Repost(_) => todo!(),
+            });
             updated |= dst.statuses.len() != len;
         });
     if updated {

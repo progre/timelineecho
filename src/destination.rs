@@ -13,7 +13,7 @@ use crate::{
     },
 };
 
-fn to_dst_identifier<'a>(
+fn find_post_dst_identifier<'a>(
     src_origin: &str,
     src_identifier: &str,
     store: &'a store::Store,
@@ -25,7 +25,11 @@ fn to_dst_identifier<'a>(
             .filter(|user| user.src.origin == src_origin)
             .flat_map(|user| &user.dsts)
             .flat_map(|dst| &dst.statuses)
-            .find(|dst| dst.src_identifier == src_identifier)?
+            .filter_map(|dst_status| match dst_status {
+                store::user::DestinationStatus::Post(post) => Some(post),
+                store::user::DestinationStatus::Repost(_) => None,
+            })
+            .find(|dst_post| dst_post.src_identifier == src_identifier)?
             .identifier
             .as_str(),
     )
@@ -50,8 +54,9 @@ pub async fn post_operation(
                     created_at,
                 },
         }) => {
-            let reply_identifier = reply_src_identifier
-                .and_then(|reply| to_dst_identifier(&account_pair.src_origin, &reply, &*store));
+            let reply_identifier = reply_src_identifier.and_then(|reply| {
+                find_post_dst_identifier(&account_pair.src_origin, &reply, &*store)
+            });
             let dst_identifier = dst_client
                 .post(
                     &content,
@@ -64,10 +69,10 @@ pub async fn post_operation(
                 .await?;
             store.get_or_create_dst_mut(&account_pair).statuses.insert(
                 0,
-                store::user::DestinationStatus {
+                store::user::DestinationStatus::Post(store::user::IdentifierPair {
                     identifier: dst_identifier,
                     src_identifier,
-                },
+                }),
             );
         }
         CreateRepost(store::operations::CreateRepostOperation {
@@ -79,7 +84,7 @@ pub async fn post_operation(
                     created_at,
                 },
         }) => {
-            let Some(target_dst_identifier) = to_dst_identifier(
+            let Some(target_dst_identifier) = find_post_dst_identifier(
                 &account_pair.src_origin,
                 &target_src_identifier,
                 &*store,
@@ -99,7 +104,7 @@ pub async fn post_operation(
             account_pair,
             status: store::operations::DeletePostOperationStatus { src_identifier },
         }) => {
-            let Some(dst_identifier) = to_dst_identifier(&account_pair.src_origin, &src_identifier, &*store) else {
+            let Some(dst_identifier) = find_post_dst_identifier(&account_pair.src_origin, &src_identifier, &*store) else {
                 warn!("dst_identifier not found (src_identifier={})", src_identifier);
                 return Ok(());
             };
