@@ -27,6 +27,7 @@ pub enum LiveExternal {
 #[derive(Clone)]
 pub struct LivePost {
     pub identifier: String,
+    pub uri: String,
     pub content: String,
     pub facets: Vec<store::operations::Facet>,
     pub reply_src_identifier: Option<String>,

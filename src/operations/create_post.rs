@@ -32,9 +32,10 @@ pub async fn create_post(
         .statuses
         .insert(
             0,
-            store::user::DestinationStatus::Post(store::user::IdentifierPair {
+            store::user::DestinationStatus::Post(store::user::DestinationPost {
                 identifier: dst_identifier,
                 src_identifier: operation.status.src_identifier,
+                src_uri: operation.status.src_uri,
             }),
         );
     Ok(())

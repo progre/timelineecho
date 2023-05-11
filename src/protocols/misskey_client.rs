@@ -99,6 +99,7 @@ impl super::Client for Client {
                         store::operations::CreateRepostOperationStatus {
                             src_identifier: get_as_string(item, "id")?,
                             target_src_identifier: get_as_string(renote, "id")?,
+                            target_src_uri: get_as_string(renote, "uri")?,
                             created_at,
                         },
                     ))
@@ -107,6 +108,7 @@ impl super::Client for Client {
                     let facets = create_facets(&content);
                     Ok(source::LiveStatus::Post(source::LivePost {
                         identifier: get_as_string(item, "id")?,
+                        uri: get_as_string(item, "uri")?,
                         content,
                         facets,
                         reply_src_identifier: get_as_string_opt(item, "replyId")?,

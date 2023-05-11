@@ -73,6 +73,7 @@ pub struct External {
 #[serde(rename_all = "camelCase")]
 pub struct CreatePostOperationStatus {
     pub src_identifier: String,
+    pub src_uri: String,
     pub content: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     #[serde(default)]
@@ -100,6 +101,7 @@ pub struct CreatePostOperation {
 pub struct CreateRepostOperationStatus {
     pub src_identifier: String,
     pub target_src_identifier: String,
+    pub target_src_uri: String,
     #[serde(with = "format_rfc3339")]
     pub created_at: DateTime<FixedOffset>,
 }

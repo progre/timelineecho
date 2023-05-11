@@ -3,7 +3,7 @@ use tracing::warn;
 
 use crate::{protocols::Client, store};
 
-use super::utils::find_post_dst_identifier;
+use super::utils::{find_post_dst_identifier, find_post_dst_identifier_by_uri};
 
 pub async fn create_repost(
     store: &mut store::Store,
@@ -15,7 +15,14 @@ pub async fn create_repost(
         &operation.account_pair.src_origin,
         &operation.status.target_src_identifier,
         &operation.account_pair.dst_origin,
-    );
+    )
+    .or_else(|| {
+        find_post_dst_identifier_by_uri(
+            &store.users,
+            &operation.status.target_src_uri,
+            &operation.account_pair.dst_origin,
+        )
+    });
     let Some(target_dst_identifier) = target_dst_identifier else {
         warn!("target_dst_identifier not found (target_src_identifier={})", operation.status.target_src_identifier);
         return Ok(());
@@ -28,7 +35,7 @@ pub async fn create_repost(
         .statuses
         .insert(
             0,
-            store::user::DestinationStatus::Repost(store::user::IdentifierPair {
+            store::user::DestinationStatus::Repost(store::user::DestinationRepost {
                 identifier: dst_identifier,
                 src_identifier: operation.status.src_identifier,
             }),

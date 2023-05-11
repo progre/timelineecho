@@ -33,6 +33,27 @@ pub fn find_post_dst_identifier<'a>(
     )
 }
 
+pub fn find_post_dst_identifier_by_uri<'a>(
+    users: &'a [store::user::User],
+    src_uri: &str,
+    dst_origin: &str,
+) -> Option<&'a str> {
+    Some(
+        users
+            .iter()
+            .flat_map(|user| &user.dsts)
+            .filter(|dst| dst.origin == dst_origin)
+            .flat_map(|dst| &dst.statuses)
+            .filter_map(|dst_status| match dst_status {
+                store::user::DestinationStatus::Post(post) => Some(post),
+                store::user::DestinationStatus::Repost(_) => None,
+            })
+            .find(|dst_post| dst_post.src_uri == src_uri)?
+            .identifier
+            .as_str(),
+    )
+}
+
 pub fn find_repost_dst_identifier<'a>(
     users: &'a [store::user::User],
     src_origin: &str,

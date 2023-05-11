@@ -74,7 +74,15 @@ pub struct Source {
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IdentifierPair {
+pub struct DestinationPost {
+    pub identifier: String,
+    pub src_identifier: String,
+    pub src_uri: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DestinationRepost {
     pub identifier: String,
     pub src_identifier: String,
 }
@@ -82,8 +90,8 @@ pub struct IdentifierPair {
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", tag = "type")]
 pub enum DestinationStatus {
-    Post(IdentifierPair),
-    Repost(IdentifierPair),
+    Post(DestinationPost),
+    Repost(DestinationRepost),
 }
 
 #[derive(Clone, Deserialize, Serialize)]

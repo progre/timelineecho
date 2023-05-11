@@ -57,6 +57,7 @@ async fn try_into_operation(live: LiveStatus, http_client: &reqwest::Client) -> 
             };
             Operation::CreatePost(store::operations::CreatePostOperationStatus {
                 src_identifier: post.identifier,
+                src_uri: post.uri,
                 content: post.content,
                 facets: post.facets,
                 reply_src_identifier: post.reply_src_identifier,
