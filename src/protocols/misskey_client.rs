@@ -9,9 +9,13 @@ use serde_json::{json, Value};
 use crate::{sources::source, store};
 
 fn get_value<'a>(value: &'a Value, key: &str) -> Result<&'a Value> {
-    value
-        .get(key)
-        .ok_or_else(|| anyhow!("{} is not found", key))
+    value.get(key).ok_or_else(|| {
+        anyhow!(
+            "{} is not found ({})",
+            key,
+            serde_json::to_string(&value).unwrap_or_default()
+        )
+    })
 }
 
 fn get_as_string_opt(value: &Value, key: &str) -> Result<Option<String>> {
@@ -95,20 +99,36 @@ impl super::Client for Client {
             .map(|item| {
                 let created_at = DateTime::parse_from_rfc3339(&get_as_string(item, "createdAt")?)?;
                 if let Some(renote) = item.get("renote") {
+                    let target_src_identifier = get_as_string(renote, "id")?;
+                    let target_src_uri = renote
+                        .get("uri") // WTF: uri が出力されない
+                        .and_then(Value::as_str)
+                        .map_or_else(
+                            || format!("{}/notes/{}", self.origin, target_src_identifier),
+                            str::to_owned,
+                        );
                     Ok(source::LiveStatus::Repost(
                         store::operations::CreateRepostOperationStatus {
                             src_identifier: get_as_string(item, "id")?,
-                            target_src_identifier: get_as_string(renote, "id")?,
-                            target_src_uri: get_as_string(renote, "uri")?,
+                            target_src_identifier,
+                            target_src_uri,
                             created_at,
                         },
                     ))
                 } else {
+                    let identifier = get_as_string(item, "id")?;
+                    let uri = item
+                        .get("uri") // WTF: uri が出力されない
+                        .and_then(Value::as_str)
+                        .map_or_else(
+                            || format!("{}/notes/{}", self.origin, identifier),
+                            str::to_owned,
+                        );
                     let content = get_as_string_opt(item, "text")?.unwrap_or_default(); // renote のみの場合は null になる
                     let facets = create_facets(&content);
                     Ok(source::LiveStatus::Post(source::LivePost {
-                        identifier: get_as_string(item, "id")?,
-                        uri: get_as_string(item, "uri")?,
+                        identifier,
+                        uri,
                         content,
                         facets,
                         reply_src_identifier: get_as_string_opt(item, "replyId")?,
@@ -126,7 +146,7 @@ impl super::Client for Client {
                     }))
                 }
             })
-            .collect::<Result<_>>()?)
+            .collect::<Result<Vec<_>>>()?)
     }
 
     #[allow(unused)]
