@@ -17,14 +17,14 @@ use crate::{
 
 use super::{merge_operations::merge_operations, operation_factory::create_operations};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LiveExternal {
     Some(store::operations::External),
     None,
     Unknown,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LivePost {
     pub identifier: String,
     pub uri: String,
@@ -36,7 +36,7 @@ pub struct LivePost {
     pub created_at: DateTime<FixedOffset>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LiveStatus {
     Post(LivePost),
     Repost(store::operations::CreateRepostOperationStatus),

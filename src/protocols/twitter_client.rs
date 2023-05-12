@@ -99,6 +99,7 @@ impl super::Client for Client {
 
         let body = TweetBody {
             media,
+            quote_tweet_id: None,
             reply: reply_identifier.map(|reply_identifier| {
                 serde_json::json!({ "in_reply_to_tweet_id": reply_identifier })
             }),
@@ -123,10 +124,17 @@ impl super::Client for Client {
         target_identifier: &str,
         _created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
-        self.api
-            .create_retweet(&self.user_id, target_identifier)
-            .await?;
-        Ok(target_identifier.into())
+        let json: Value = self.api.create_retweet(target_identifier).await?;
+        let id = json
+            .get("data")
+            .ok_or_else(|| anyhow!("data is not found"))?
+            .as_object()
+            .ok_or_else(|| anyhow!("data is not object"))?
+            .get("id")
+            .ok_or_else(|| anyhow!("id is not found"))?
+            .as_str()
+            .ok_or_else(|| anyhow!("id is not str"))?;
+        Ok(id.to_owned())
     }
 
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
@@ -136,10 +144,7 @@ impl super::Client for Client {
 
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let target_identifier = identifier;
-        let _: Value = self
-            .api
-            .delete_retweet(&self.user_id, target_identifier)
-            .await?;
+        let _: Value = self.api.delete_retweet(target_identifier).await?;
         Ok(())
     }
 }

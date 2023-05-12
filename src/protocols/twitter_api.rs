@@ -9,7 +9,7 @@ use reqwest::{
     Body, Response,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use tracing::{error, event_enabled, trace, Level};
 
 async fn trace_header_and_throw_if_error_status(resp: Response) -> Result<Response> {
@@ -47,10 +47,11 @@ async fn trace_header_and_throw_if_error_status(resp: Response) -> Result<Respon
 }
 
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct TweetBody<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub media: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quote_tweet_id: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reply: Option<Value>,
     pub text: &'a str,
@@ -124,41 +125,20 @@ impl Api {
         Ok(resp.json().await?)
     }
 
-    pub async fn create_retweet<T: DeserializeOwned>(
-        &self,
-        user_id: &str,
-        tweet_id: &str,
-    ) -> Result<T> {
-        let url = format!("https://api.twitter.com/2/users/{}/retweets", user_id);
-        let resp = self
-            .http_client
-            .post(&url)
-            .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
-            .json(&json!({ "tweet_id": tweet_id }))
-            .send()
-            .await?;
-        let resp = trace_header_and_throw_if_error_status(resp).await?;
-        Ok(resp.json().await?)
+    pub async fn create_retweet<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
+        // WTF: retweet は課金要素
+        let body = TweetBody {
+            media: None,
+            quote_tweet_id: Some(tweet_id),
+            reply: None,
+            text: "RT:",
+        };
+        self.create_tweet(body).await
     }
 
-    pub async fn delete_retweet<T: DeserializeOwned>(
-        &self,
-        user_id: &str,
-        source_tweet_id: &str,
-    ) -> Result<T> {
-        let url = format!(
-            "https://api.twitter.com/2/users/{}/retweets/{}",
-            user_id, source_tweet_id
-        );
-        let resp = self
-            .http_client
-            .delete(&url)
-            .header(AUTHORIZATION, self.oauth1_request_builder.delete(url, &()))
-            .header(ACCEPT, "application/json")
-            .send()
-            .await?;
-        let resp = trace_header_and_throw_if_error_status(resp).await?;
-        Ok(resp.json().await?)
+    pub async fn delete_retweet<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
+        // WTF: retweet は課金要素
+        self.delete_tweet(tweet_id).await
     }
 
     pub async fn verify_credentials<T: DeserializeOwned>(&self) -> Result<T> {

@@ -53,7 +53,7 @@ pub enum Facet {
     Link { byte_slice: Range<u32>, uri: String },
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Medium {
     pub url: String,
@@ -96,7 +96,7 @@ pub struct CreatePostOperation {
     pub status: CreatePostOperationStatus,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateRepostOperationStatus {
     pub src_identifier: String,
