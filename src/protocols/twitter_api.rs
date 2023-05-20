@@ -125,7 +125,21 @@ impl Api {
         Ok(resp.json().await?)
     }
 
-    pub async fn create_retweet<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
+    pub async fn create_retweet_1_1<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
+        let url = format!(
+            "https://api.twitter.com/1.1/statuses/retweet/{}.json",
+            tweet_id
+        );
+        let resp = self
+            .http_client
+            .post(&url)
+            .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
+            .send()
+            .await?;
+        Ok(resp.json().await?)
+    }
+
+    pub async fn create_retweet_proxy<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
         // WTF: retweet は課金要素
         let body = TweetBody {
             media: None,
@@ -136,7 +150,22 @@ impl Api {
         self.create_tweet(body).await
     }
 
-    pub async fn delete_retweet<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
+    pub async fn delete_retweet_1_1<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
+        let url = format!(
+            "https://api.twitter.com/1.1/statuses/unretweet/{}.json",
+            tweet_id
+        );
+        let resp = self
+            .http_client
+            .post(&url)
+            .header(AUTHORIZATION, self.oauth1_request_builder.post(url, &()))
+            .send()
+            .await?;
+        let resp = trace_header_and_throw_if_error_status(resp).await?;
+        Ok(resp.json().await?)
+    }
+
+    pub async fn delete_retweet_proxy<T: DeserializeOwned>(&self, tweet_id: &str) -> Result<T> {
         // WTF: retweet は課金要素
         self.delete_tweet(tweet_id).await
     }

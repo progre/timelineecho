@@ -124,7 +124,18 @@ impl super::Client for Client {
         target_identifier: &str,
         _created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
-        let json: Value = self.api.create_retweet(target_identifier).await?;
+        let result = self
+            .api
+            .create_retweet_1_1::<Value>(target_identifier)
+            .await;
+        let Err(err) = result else {
+            return Ok(target_identifier.into());
+        };
+        // 1.1 のアクセス違反の場合のみ proxy を使う
+        if !err.to_string().contains("403") {
+            return Err(err);
+        }
+        let json: Value = self.api.create_retweet_proxy(target_identifier).await?;
         let id = json
             .get("data")
             .ok_or_else(|| anyhow!("data is not found"))?
@@ -144,7 +155,20 @@ impl super::Client for Client {
 
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let target_identifier = identifier;
-        let _: Value = self.api.delete_retweet(target_identifier).await?;
+        let result = self
+            .api
+            .delete_retweet_1_1::<Value>(target_identifier)
+            .await;
+        let Err(err) = result else {
+            return Ok(());
+        };
+        // 1.1 のアクセス違反の場合のみ proxy を使う
+        if !err.to_string().contains("403") {
+            return Err(err);
+        }
+        self.api
+            .delete_retweet_proxy::<Value>(target_identifier)
+            .await?;
         Ok(())
     }
 }
