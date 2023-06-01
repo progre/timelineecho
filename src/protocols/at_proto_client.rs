@@ -2,13 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use atrium_api::{
-    app,
-    com::{
-        self,
-        atproto::repo::{create_record::CreateRecord, delete_record::DeleteRecord},
-    },
-};
+use atrium_api::com::atproto::repo::{create_record::CreateRecord, delete_record::DeleteRecord};
 use chrono::{DateTime, FixedOffset};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
@@ -322,14 +316,15 @@ impl super::Client for Client {
 
         let identifier: com::atproto::repo::create_record::Output =
             serde_json::from_str(target_identifier)?;
-        let record =
-            atrium_api::records::Record::AppBskyFeedRepost(app::bsky::feed::repost::Record {
+        let record = atrium_api::records::Record::AppBskyFeedRepost(Box::new(
+            app::bsky::feed::repost::Record {
                 created_at: created_at.to_rfc3339(),
                 subject: com::atproto::repo::strong_ref::Main {
                     cid: identifier.cid,
                     uri: identifier.uri,
                 },
-            });
+            },
+        ));
         let res = self
             .as_atrium_client()
             .create_record(com::atproto::repo::create_record::Input {
