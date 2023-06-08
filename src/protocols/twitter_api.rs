@@ -13,36 +13,35 @@ use serde_json::Value;
 use tracing::{error, event_enabled, trace, Level};
 
 async fn trace_header_and_throw_if_error_status(resp: Response) -> Result<Response> {
+    if event_enabled!(Level::TRACE) {
+        resp.headers()
+            .iter()
+            .filter(|(key, _)| {
+                [
+                    "date",
+                    "x-rate-limit-limit",
+                    "x-rate-limit-reset",
+                    "x-rate-limit-remaining",
+                ]
+                .contains(&key.as_str())
+            })
+            .for_each(|(key, value)| {
+                let value = value.to_str().unwrap_or_default();
+                let value = if key == "x-rate-limit-reset" {
+                    NaiveDateTime::from_timestamp_opt(value.parse::<i64>().unwrap_or_default(), 0)
+                        .unwrap_or_default()
+                        .to_string()
+                } else {
+                    value.to_owned()
+                };
+                trace!("{}: {}", key, value);
+            });
+    }
     let err = resp.error_for_status_ref().err();
     if let Some(err) = err {
         error!("{:?}", resp.text().await?);
         return Err(err.into());
     }
-    if !event_enabled!(Level::TRACE) {
-        return Ok(resp);
-    }
-    resp.headers()
-        .iter()
-        .filter(|(key, _)| {
-            [
-                "date",
-                "x-rate-limit-limit",
-                "x-rate-limit-reset",
-                "x-rate-limit-remaining",
-            ]
-            .contains(&key.as_str())
-        })
-        .for_each(|(key, value)| {
-            let value = value.to_str().unwrap_or_default();
-            let value = if key == "x-rate-limit-reset" {
-                NaiveDateTime::from_timestamp_opt(value.parse::<i64>().unwrap_or_default(), 0)
-                    .unwrap_or_default()
-                    .to_string()
-            } else {
-                value.to_owned()
-            };
-            trace!("{}: {}", key, value);
-        });
     Ok(resp)
 }
 

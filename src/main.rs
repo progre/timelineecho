@@ -1,12 +1,3 @@
-#![warn(clippy::pedantic)]
-#![allow(clippy::cast_lossless)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::cast_possible_wrap)]
-#![allow(clippy::no_effect_underscore_binding)]
-#![allow(clippy::single_match_else)]
-#![allow(clippy::uninlined_format_args)]
-#![allow(clippy::unreadable_literal)]
-
 mod app;
 mod config;
 mod database;
