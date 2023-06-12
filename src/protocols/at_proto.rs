@@ -7,6 +7,7 @@ use self::{repo::Repo, server::Server};
 
 pub mod repo;
 pub mod server;
+pub mod utils;
 
 pub struct Api {
     pub origin: String,
