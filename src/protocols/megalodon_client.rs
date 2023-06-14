@@ -1,7 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
-use html2text::render::text_renderer::RichAnnotation;
 use megalodon::{megalodon::GetAccountStatusesInputOptions, Megalodon};
 use reqwest::header::HeaderMap;
 use tracing::{event_enabled, trace, Level};
@@ -26,39 +25,6 @@ fn trace_header(header: &HeaderMap) {
         .for_each(|(key, value)| {
             trace!("{}: {}", key, value.to_str().unwrap_or_default());
         });
-}
-
-fn link(current_idx: usize, uri: &str) -> store::operations::Facet {
-    store::operations::Facet::Link {
-        byte_slice: (current_idx as u32)..(current_idx as u32) + (uri.as_bytes().len() as u32),
-        uri: uri.to_owned(),
-    }
-}
-
-fn html_to_content_facets(html: &str) -> (String, Vec<store::operations::Facet>) {
-    let content = html2text::from_read_rich(html.as_bytes(), usize::MAX);
-    let mut text = String::new();
-    let mut facets = Vec::new();
-    for line in content {
-        for string in line.tagged_strings() {
-            if string.tag.is_empty() {
-                text += &string.s;
-                continue;
-            }
-            assert_eq!(string.tag.len(), 1);
-            if let RichAnnotation::Link(_) = &string.tag[0] {
-                // NOTE: ハッシュタグは未対応
-                if !string.s.starts_with('#') {
-                    facets.push(link(text.as_bytes().len(), &string.s));
-                }
-                text += &string.s;
-                continue;
-            }
-            unreachable!();
-        }
-        text += "\n";
-    }
-    (text.trim_end().to_owned(), facets)
 }
 
 pub struct Client {
@@ -113,45 +79,7 @@ impl super::Client for Client {
         let statuses: Vec<_> = resp
             .json()
             .into_iter()
-            .map(|status| {
-                if let Some(reblog) = status.reblog {
-                    source::LiveStatus::Repost(store::operations::CreateRepostOperationStatus {
-                        src_identifier: status.id,
-                        target_src_identifier: reblog.id,
-                        target_src_uri: reblog.uri,
-                        created_at: status.created_at.into(),
-                    })
-                } else {
-                    let (content, facets) = html_to_content_facets(&status.content);
-                    source::LiveStatus::Post(source::LivePost {
-                        identifier: status.id,
-                        uri: status.uri,
-                        content,
-                        facets,
-                        reply_src_identifier: status.in_reply_to_id,
-                        media: status
-                            .media_attachments
-                            .into_iter()
-                            .map(|media| store::operations::Medium {
-                                url: media.url,
-                                alt: media.description.unwrap_or_default(),
-                            })
-                            .collect(),
-                        external: status.card.map_or_else(
-                            || source::LiveExternal::None,
-                            |card| {
-                                source::LiveExternal::Some(store::operations::External {
-                                    uri: card.url,
-                                    title: card.title,
-                                    description: card.description,
-                                    thumb_url: card.image,
-                                })
-                            },
-                        ),
-                        created_at: status.created_at.into(),
-                    })
-                }
-            })
+            .map(|status| status.into())
             .collect();
 
         Ok(statuses)
