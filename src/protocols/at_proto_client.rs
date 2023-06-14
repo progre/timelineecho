@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use atrium_api::{
-    app,
+    app::{self, bsky::feed::get_author_feed::GetAuthorFeed},
     com::{
         self,
         atproto::repo::{create_record::CreateRecord, delete_record::DeleteRecord},
@@ -69,7 +69,25 @@ impl super::Client for Client {
     }
 
     async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
-        todo!()
+        let session = match &self.session {
+            Some(some) => some,
+            None => {
+                self.init_session().await?;
+                self.session.as_ref().unwrap()
+            }
+        };
+
+        let params = app::bsky::feed::get_author_feed::Parameters {
+            actor: session.did.clone(),
+            cursor: None,
+            limit: None,
+        };
+        let output = self
+            .as_atrium_client()
+            .get_author_feed(params)
+            .await
+            .map_err(|err| anyhow::anyhow!("{:?}", err))?;
+        output.feed.into_iter().map(|x| x.try_into()).collect()
     }
 
     async fn post(
@@ -127,7 +145,7 @@ impl super::Client for Client {
         let res = self
             .as_atrium_client()
             .create_record(com::atproto::repo::create_record::Input {
-                collection: String::from("app.bsky.feed.repost"),
+                collection: "app.bsky.feed.repost".into(),
                 record,
                 repo: session.did.clone(),
                 rkey: None,

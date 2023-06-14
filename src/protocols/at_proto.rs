@@ -5,6 +5,7 @@ use tracing::error;
 
 use self::{repo::Repo, server::Server};
 
+pub mod from_atrium;
 pub mod repo;
 pub mod server;
 pub mod utils;
