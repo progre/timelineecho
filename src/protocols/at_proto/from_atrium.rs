@@ -1,6 +1,10 @@
 use anyhow::Result;
-use atrium_api::app::{self, bsky::feed::defs::PostViewEmbedEnum};
+use atrium_api::app::{
+    self,
+    bsky::feed::defs::{FeedViewPostReasonEnum, PostViewEmbedEnum},
+};
 use chrono::DateTime;
+use regex::Regex;
 
 use crate::{sources::source, store};
 
@@ -59,20 +63,39 @@ impl TryFrom<app::bsky::feed::defs::FeedViewPost> for source::LiveStatus {
             | Some(PostViewEmbedEnum::AppBskyEmbedRecordWithMediaView(_))
             | None => (vec![], source::LiveExternal::None),
         };
-        Ok(source::LiveStatus::Post(source::LivePost {
-            identifier: value.post.cid.clone(),
-            uri: value.post.uri.clone(),
-            content: record.text,
-            facets: record
-                .facets
-                .into_iter()
-                .flatten()
-                .map(|x| x.into())
-                .collect(),
-            reply_src_identifier: record.reply.map(|x| x.parent.cid),
-            media,
-            external,
-            created_at: DateTime::parse_from_rfc3339(&record.created_at)?,
-        }))
+        Ok(
+            if let Some(FeedViewPostReasonEnum::ReasonRepost(reason)) = value.reason {
+                let m = Regex::new(r"^at://(.+?)/app.bsky.feed.post/(.+?)$")
+                    .unwrap()
+                    .captures(&value.post.uri)
+                    .unwrap();
+                source::LiveStatus::Repost(store::operations::CreateRepostOperationStatus {
+                    src_identifier: value.post.cid.clone(),
+                    target_src_identifier: value.post.cid.clone(),
+                    target_src_uri: format!(
+                        "https://bsky.app/profile/{}/post/{}",
+                        m.get(1).unwrap().as_str(),
+                        m.get(2).unwrap().as_str(),
+                    ),
+                    created_at: DateTime::parse_from_rfc3339(&reason.indexed_at)?,
+                })
+            } else {
+                source::LiveStatus::Post(source::LivePost {
+                    identifier: value.post.cid.clone(),
+                    uri: value.post.uri.clone(),
+                    content: record.text,
+                    facets: record
+                        .facets
+                        .into_iter()
+                        .flatten()
+                        .map(|x| x.into())
+                        .collect(),
+                    reply_src_identifier: record.reply.map(|x| x.parent.cid),
+                    media,
+                    external,
+                    created_at: DateTime::parse_from_rfc3339(&record.created_at)?,
+                })
+            },
+        )
     }
 }
