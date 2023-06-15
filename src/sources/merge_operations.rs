@@ -31,10 +31,11 @@ fn to_store_operations(
 
 /** 投稿は降順で、それ以外は末尾に積む */
 fn sort_operations(operations: &mut [store::operations::Operation]) {
-    operations.sort_by_key(|operation| match operation {
-        CreatePost(content) => -content.status.created_at.timestamp_micros(),
-        CreateRepost(content) => -content.status.created_at.timestamp_micros(),
-        UpdatePost(_) | DeletePost(_) | DeleteRepost(_) => i64::MAX,
+    operations.sort_by_key(|operation| -match operation {
+        CreatePost(content) => content.status.created_at.timestamp_micros(),
+        CreateRepost(content) => content.status.created_at.timestamp_micros(),
+        UpdatePost(_) | DeleteRepost(_) => i64::MAX - 1,
+        DeletePost(_) => i64::MAX,
     });
 }
 
