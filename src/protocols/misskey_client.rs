@@ -72,7 +72,7 @@ impl Client {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl super::Client for Client {
     fn origin(&self) -> &str {
         &self.origin

@@ -15,7 +15,7 @@ use futures::future::join_all;
 
 use crate::{app::AccountKey, config, sources::source, store};
 
-#[async_trait(?Send)]
+#[async_trait]
 pub trait Client {
     fn to_account_key(&self) -> AccountKey {
         AccountKey {

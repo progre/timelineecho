@@ -104,7 +104,7 @@ fn to_megalodon_post_status_input_options(
 pub struct Client {
     origin: String,
     access_token: String,
-    megalodon: Box<dyn Megalodon>,
+    megalodon: Box<dyn Megalodon + Send + Sync>,
     account_id: String,
 }
 
@@ -129,7 +129,7 @@ impl Client {
     }
 }
 
-#[async_trait(?Send)]
+#[async_trait]
 impl super::Client for Client {
     fn origin(&self) -> &str {
         &self.origin
