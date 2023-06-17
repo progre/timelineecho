@@ -1,6 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Ok, Result};
+use tokio::{spawn, time::sleep};
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     database::Database,
@@ -14,7 +16,10 @@ pub struct AccountKey {
     pub identifier: String,
 }
 
-pub async fn app(database: &impl Database) -> Result<()> {
+pub async fn do_main_task(
+    cancellation_token: &CancellationToken,
+    database: &impl Database,
+) -> Result<()> {
     let config = database.config().await?;
 
     let mut store = database.fetch().await.unwrap_or_default();
@@ -31,10 +36,32 @@ pub async fn app(database: &impl Database) -> Result<()> {
         )
         .await?;
     }
-    post(database, &mut store, &mut dst_client_map).await?;
+    if cancellation_token.is_cancelled() {
+        return Ok(());
+    }
+    post(
+        cancellation_token,
+        database,
+        &mut store,
+        &mut dst_client_map,
+    )
+    .await?;
+    if cancellation_token.is_cancelled() {
+        return Ok(());
+    }
     if store.operations.is_empty() {
         retain_all_dst_statuses(database, &mut store).await?;
     }
 
     Ok(())
+}
+
+pub async fn app(database: impl Database) -> Result<()> {
+    let cancellation_token = CancellationToken::new();
+    let cancellation_cancel_token = cancellation_token.clone();
+    spawn(async move {
+        sleep(Duration::from_secs(30)).await;
+        cancellation_cancel_token.cancel();
+    });
+    spawn(async move { do_main_task(&cancellation_token, &database).await }).await?
 }

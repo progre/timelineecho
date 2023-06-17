@@ -11,7 +11,7 @@ use tracing::{error, info};
 use crate::{config::Config, store};
 
 #[async_trait]
-pub trait Database {
+pub trait Database: Send + Sync + 'static {
     async fn config(&self) -> Result<Config>;
     async fn fetch(&self) -> Result<store::Store>;
     async fn commit(&self, store: &store::Store) -> Result<()>;

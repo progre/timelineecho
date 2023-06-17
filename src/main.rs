@@ -50,7 +50,7 @@ mod local {
     pub async fn main() -> Result<()> {
         init_tracing();
 
-        app(&database::File).await
+        app(database::File).await
     }
 }
 
@@ -71,7 +71,7 @@ mod lambda {
     pub async fn function_handler(
         _event: LambdaEvent<CloudWatchEvent>,
     ) -> Result<(), lambda_runtime::Error> {
-        if let Err(err) = app(&database::DynamoDB::new().await).await {
+        if let Err(err) = app(database::DynamoDB::new().await).await {
             tracing::error!("{:?}", err);
             return Err(err.into());
         }

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::AccountKey,
@@ -34,12 +35,12 @@ fn find_dst_client<'a>(
 }
 
 pub async fn post(
+    cancellation_token: &CancellationToken,
     database: &impl Database,
     store: &mut store::Store,
     dst_clients_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
-    // WTF: DynamoDB の連続アクセス不能問題が解消するまで連続作業を絞る
-    for _ in 0..2 {
+    while !cancellation_token.is_cancelled() {
         let Some(operation) = store.operations.pop() else {
             break;
         };
