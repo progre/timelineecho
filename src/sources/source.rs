@@ -6,7 +6,6 @@ use chrono::{DateTime, FixedOffset};
 use crate::{
     app::AccountKey,
     config,
-    database::Database,
     protocols::{create_client, create_clients, Client},
     store::{
         self,
@@ -115,7 +114,6 @@ fn has_users_operations(operations: &[store::operations::Operation], src_key: &A
 }
 
 pub async fn get(
-    database: &impl Database,
     http_client: &Arc<reqwest::Client>,
     config_user: &config::User,
     store: &mut store::Store,
@@ -127,7 +125,6 @@ pub async fn get(
     let has_users_operations = has_users_operations(&store.operations, &src_account_key);
     let stored_user = store.get_or_create_user_mut(&src_account_key);
     let src = &mut stored_user.src;
-    let initialize = src.statuses.is_empty();
 
     let (statuses, operations) =
         fetch_statuses(src_client.as_mut(), http_client.as_ref(), &src.statuses).await?;
@@ -139,9 +136,6 @@ pub async fn get(
             merge_operations(store, &dst_clients, &src_account_key, &operations);
         }
         dst_client_map.insert(src_client.to_account_key(), dst_clients);
-    }
-    if initialize || !operations.is_empty() {
-        database.commit(&*store).await?;
     }
     Ok(())
 }
@@ -171,20 +165,15 @@ fn necessary_repost_src_identifiers(users: &[store::user::User]) -> Vec<String> 
         .collect()
 }
 
-pub async fn retain_all_dst_statuses(
-    database: &impl Database,
-    store: &mut store::Store,
-) -> Result<()> {
+pub async fn retain_all_dst_statuses(store: &mut store::Store) -> Result<()> {
     let necessary_post_src_identifiers = necessary_post_src_identifiers(&store.users);
     let necessary_repost_src_identifiers = necessary_repost_src_identifiers(&store.users);
 
-    let mut updated = false;
     store
         .users
         .iter_mut()
         .flat_map(|user| user.dsts.iter_mut())
         .for_each(|dst| {
-            let len = dst.statuses.len();
             dst.statuses.retain(|status| match status {
                 store::user::DestinationStatus::Post(post) => {
                     necessary_post_src_identifiers.contains(&post.src_identifier)
@@ -193,10 +182,6 @@ pub async fn retain_all_dst_statuses(
                     necessary_repost_src_identifiers.contains(&repost.src_identifier)
                 }
             });
-            updated |= dst.statuses.len() != len;
         });
-    if updated {
-        database.commit(&*store).await?;
-    }
     Ok(())
 }

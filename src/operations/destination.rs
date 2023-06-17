@@ -5,7 +5,6 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{
     app::AccountKey,
-    database::Database,
     protocols::Client,
     store::{
         self,
@@ -36,7 +35,6 @@ fn find_dst_client<'a>(
 
 pub async fn post(
     cancellation_token: &CancellationToken,
-    database: &impl Database,
     store: &mut store::Store,
     dst_clients_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
@@ -54,7 +52,6 @@ pub async fn post(
             DeletePost(operation) => delete_post(store, dst_client, operation).await?,
             DeleteRepost(operation) => delete_repost(store, dst_client, operation).await?,
         }
-        database.commit(store).await?;
     }
     Ok(())
 }
