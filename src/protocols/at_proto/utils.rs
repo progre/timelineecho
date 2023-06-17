@@ -48,10 +48,14 @@ impl atrium_api::xrpc::XrpcClient for AtriumClient<'_> {
     fn host(&self) -> &str {
         "https://bsky.social"
     }
-    fn auth(&self) -> Option<&str> {
-        self.session
-            .as_ref()
-            .map(|session| session.access_jwt.as_str())
+    fn auth(&self, is_refresh: bool) -> Option<&str> {
+        self.session.as_ref().map(|session| {
+            if is_refresh {
+                session.refresh_jwt.as_str()
+            } else {
+                session.access_jwt.as_str()
+            }
+        })
     }
 }
 
