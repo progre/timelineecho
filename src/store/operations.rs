@@ -69,7 +69,7 @@ pub struct External {
     pub thumb_url: Option<String>,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePostOperationStatus {
     pub src_identifier: String,
@@ -115,7 +115,7 @@ pub struct CreateRepostOperation {
     pub status: CreateRepostOperationStatus,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdatePostOperationStatus {
     pub src_identifier: String,
@@ -133,7 +133,7 @@ pub struct UpdatePostOperation {
     pub status: UpdatePostOperationStatus,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeletePostOperationStatus {
     pub src_identifier: String,
@@ -148,7 +148,7 @@ pub struct DeletePostOperation {
     pub status: DeletePostOperationStatus,
 }
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeleteRepostOperationStatus {
     pub src_identifier: String,

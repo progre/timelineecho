@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use atrium_api::app::{
     self,
     bsky::feed::defs::{FeedViewPostReasonEnum, PostViewEmbedEnum},
@@ -8,17 +8,21 @@ use regex::Regex;
 
 use crate::{sources::source, store};
 
-impl From<app::bsky::richtext::facet::Main> for store::operations::Facet {
-    fn from(value: app::bsky::richtext::facet::Main) -> Self {
+impl TryFrom<app::bsky::richtext::facet::Main> for store::operations::Facet {
+    type Error = anyhow::Error;
+
+    fn try_from(value: app::bsky::richtext::facet::Main) -> Result<Self> {
         assert_eq!(value.features.len(), 1);
         let feature = &value.features[0];
         match feature {
-            app::bsky::richtext::facet::MainFeaturesItem::Mention(_) => todo!(),
+            app::bsky::richtext::facet::MainFeaturesItem::Mention(mention) => {
+                Err(anyhow!("mention is not implemented: {:?}", mention))
+            }
             app::bsky::richtext::facet::MainFeaturesItem::Link(link) => {
-                store::operations::Facet::Link {
+                Ok(store::operations::Facet::Link {
                     byte_slice: (value.index.byte_start as u32)..(value.index.byte_end as u32),
                     uri: link.uri.clone(),
-                }
+                })
             }
         }
     }

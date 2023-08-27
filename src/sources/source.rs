@@ -2,6 +2,7 @@ use std::{collections::HashMap, convert::Into, sync::Arc};
 
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
+use tracing::trace;
 
 use crate::{
     app::AccountKey,
@@ -53,6 +54,7 @@ impl LiveStatus {
     }
 }
 
+#[derive(Debug)]
 pub enum Operation {
     CreatePost(store::operations::CreatePostOperationStatus),
     CreateRepost(store::operations::CreateRepostOperationStatus),
@@ -129,6 +131,7 @@ pub async fn get(
     let (statuses, operations) =
         fetch_statuses(src_client.as_mut(), http_client.as_ref(), &src.statuses).await?;
     src.statuses = statuses;
+    trace!("new operations: {:?}", operations);
 
     if !operations.is_empty() || has_users_operations {
         let dst_clients = create_clients(http_client, &config_user.dsts).await?;

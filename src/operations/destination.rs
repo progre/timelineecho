@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, trace};
 
 use crate::{
     app::AccountKey,
@@ -38,20 +39,30 @@ pub async fn post(
     store: &mut store::Store,
     dst_clients_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
 ) -> Result<()> {
-    while !cancellation_token.is_cancelled() {
+    trace!("post");
+    loop {
+        trace!("post loop");
+        if cancellation_token.is_cancelled() {
+            debug!("cancel accepted");
+            return Ok(());
+        }
         let Some(operation) = store.operations.pop() else {
-            break;
+            trace!("post completed");
+            return Ok(());
         };
 
         let dst_client = find_dst_client(dst_clients_map, operation.account_pair()).unwrap();
 
-        match operation {
-            CreatePost(operation) => create_post(store, dst_client, operation).await?,
-            CreateRepost(operation) => create_repost(store, dst_client, operation).await?,
+        let result = match operation {
+            CreatePost(operation) => create_post(store, dst_client, operation).await,
+            CreateRepost(operation) => create_repost(store, dst_client, operation).await,
             UpdatePost(_) => todo!(),
-            DeletePost(operation) => delete_post(store, dst_client, operation).await?,
-            DeleteRepost(operation) => delete_repost(store, dst_client, operation).await?,
+            DeletePost(operation) => delete_post(store, dst_client, operation).await,
+            DeleteRepost(operation) => delete_repost(store, dst_client, operation).await,
+        };
+        if let Err(err) = result {
+            error!("{:?}", err);
+            bail!("post failed");
         }
     }
-    Ok(())
 }
