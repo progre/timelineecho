@@ -48,6 +48,35 @@ impl From<Box<app::bsky::embed::external::View>> for source::LiveExternal {
     }
 }
 
+fn rewrite_content(
+    mut content: String,
+    mut facets: Option<Vec<app::bsky::richtext::facet::Main>>,
+) -> String {
+    let Some(facets) = &mut facets else {
+        return content;
+    };
+    facets.sort_by_key(|x| x.index.byte_start);
+    facets.reverse();
+    for facet in facets {
+        let Some(link) = facet
+            .features
+            .iter()
+            .filter_map(|x| match x {
+                app::bsky::richtext::facet::MainFeaturesItem::Link(link) => Some(link),
+                app::bsky::richtext::facet::MainFeaturesItem::Mention(_) => None,
+            })
+            .next()
+        else {
+            continue;
+        };
+        content.replace_range(
+            (facet.index.byte_start as usize)..(facet.index.byte_end as usize),
+            &link.uri,
+        );
+    }
+    content
+}
+
 impl TryFrom<app::bsky::feed::defs::FeedViewPost> for source::LiveStatus {
     type Error = anyhow::Error;
 
@@ -84,16 +113,17 @@ impl TryFrom<app::bsky::feed::defs::FeedViewPost> for source::LiveStatus {
                     created_at: DateTime::parse_from_rfc3339(&reason.indexed_at)?,
                 })
             } else {
+                let facets = record
+                    .facets
+                    .iter()
+                    .flatten()
+                    .filter_map(|x| x.to_owned().try_into().ok())
+                    .collect();
                 source::LiveStatus::Post(source::LivePost {
                     identifier: value.post.cid.clone(),
                     uri: value.post.uri.clone(),
-                    content: record.text,
-                    facets: record
-                        .facets
-                        .into_iter()
-                        .flatten()
-                        .map(|x| x.into())
-                        .collect(),
+                    content: rewrite_content(record.text.to_owned(), record.facets),
+                    facets,
                     reply_src_identifier: record.reply.map(|x| x.parent.cid),
                     media,
                     external,
