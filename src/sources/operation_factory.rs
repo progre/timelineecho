@@ -88,6 +88,18 @@ pub async fn create_operations(
         .filter(|live| {
             last_date_time.map_or(true, |last_date_time| live.created_at() > last_date_time)
         })
+        .filter(|live| {
+            if let LiveStatus::Post(post) = live {
+                // 自分宛てのリプライのみを投稿対象にする
+                if let Some(reply_src_identifier) = &post.reply_src_identifier {
+                    return live_statuses.iter().any(|live| match live {
+                        LiveStatus::Post(post) => &post.identifier == reply_src_identifier,
+                        LiveStatus::Repost(_) => false,
+                    });
+                }
+            }
+            true
+        })
         .map(|live| try_into_operation(live.clone(), http_client));
     let c = join_all(c).await.into_iter().collect::<Result<Vec<_>>>()?;
     // UD
