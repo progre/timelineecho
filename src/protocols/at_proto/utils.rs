@@ -1,5 +1,8 @@
 use anyhow::{anyhow, Result};
-use atrium_api::app::bsky::feed::post::ReplyRef;
+use atrium_api::{
+    app::{self, bsky::feed::post::ReplyRef},
+    com,
+};
 use chrono::{DateTime, FixedOffset};
 use regex::Regex;
 use reqwest::header::CONTENT_TYPE;
@@ -28,10 +31,10 @@ impl<'a> AtriumClient<'a> {
 
 #[async_trait::async_trait]
 impl atrium_api::xrpc::HttpClient for AtriumClient<'_> {
-    async fn send(
+    async fn send_http(
         &self,
         req: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, Box<dyn std::error::Error>> {
+    ) -> Result<http::Response<Vec<u8>>, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let resp = self.http_client.execute(req.try_into()?).await?;
         let mut builder = http::Response::builder().status(resp.status());
         for (k, v) in resp.headers() {
@@ -48,18 +51,16 @@ impl atrium_api::xrpc::XrpcClient for AtriumClient<'_> {
     fn host(&self) -> &str {
         "https://bsky.social"
     }
-    fn auth(&self, is_refresh: bool) -> Option<&str> {
+    fn auth(&self, is_refresh: bool) -> Option<String> {
         self.session.as_ref().map(|session| {
             if is_refresh {
-                session.refresh_jwt.as_str()
+                session.refresh_jwt.clone()
             } else {
-                session.access_jwt.as_str()
+                session.access_jwt.clone()
             }
         })
     }
 }
-
-atrium_api::impl_traits!(AtriumClient<'_>);
 
 pub fn to_record<'a>(
     text: &'a str,

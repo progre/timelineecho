@@ -24,6 +24,9 @@ impl TryFrom<app::bsky::richtext::facet::Main> for store::operations::Facet {
                     uri: link.uri.clone(),
                 })
             }
+            app::bsky::richtext::facet::MainFeaturesItem::Tag(tag) => {
+                Err(anyhow!("tag is not implemented: {:?}", tag))
+            }
         }
     }
 }
@@ -64,6 +67,7 @@ fn rewrite_content(
             .filter_map(|x| match x {
                 app::bsky::richtext::facet::MainFeaturesItem::Link(link) => Some(link),
                 app::bsky::richtext::facet::MainFeaturesItem::Mention(_) => None,
+                app::bsky::richtext::facet::MainFeaturesItem::Tag(_) => None,
             })
             .next()
         else {

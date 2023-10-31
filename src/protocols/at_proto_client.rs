@@ -3,11 +3,9 @@ use std::sync::Arc;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use atrium_api::{
-    app::{self, bsky::feed::get_author_feed::GetAuthorFeed},
-    com::{
-        self,
-        atproto::repo::{create_record::CreateRecord, delete_record::DeleteRecord},
-    },
+    app,
+    client::{AtpServiceClient, AtpServiceWrapper},
+    com,
 };
 use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
@@ -43,8 +41,8 @@ impl Client {
         }
     }
 
-    fn as_atrium_client(&self) -> AtriumClient<'_> {
-        AtriumClient::new(&self.http_client, &self.session)
+    fn as_atrium_client(&self) -> AtpServiceClient<AtpServiceWrapper<AtriumClient>> {
+        AtpServiceClient::new(AtriumClient::new(&self.http_client, &self.session))
     }
 
     async fn init_session(&mut self) -> Result<()> {
@@ -80,10 +78,15 @@ impl super::Client for Client {
         let params = app::bsky::feed::get_author_feed::Parameters {
             actor: session.did.clone(),
             cursor: None,
+            filter: None,
             limit: None,
         };
         let output = self
             .as_atrium_client()
+            .service
+            .app
+            .bsky
+            .feed
             .get_author_feed(params)
             .await
             .map_err(|err| anyhow::anyhow!("{:?}", err))?;
@@ -144,6 +147,10 @@ impl super::Client for Client {
         ));
         let res = self
             .as_atrium_client()
+            .service
+            .com
+            .atproto
+            .repo
             .create_record(com::atproto::repo::create_record::Input {
                 collection: "app.bsky.feed.repost".into(),
                 record,
@@ -201,6 +208,10 @@ impl super::Client for Client {
             swap_record: None,
         };
         self.as_atrium_client()
+            .service
+            .com
+            .atproto
+            .repo
             .delete_record(input)
             .await
             .map_err(|err| anyhow::anyhow!("{:?}", err))?;
