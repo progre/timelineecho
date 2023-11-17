@@ -2,11 +2,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use atrium_api::{
-    app,
-    client::{AtpServiceClient, AtpServiceWrapper},
-    com,
-};
+use atrium_api::{app, client::AtpServiceClient, com};
 use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 
@@ -14,13 +10,13 @@ use crate::{sources::source, store};
 
 use super::at_proto::{
     utils::{to_embed, to_record, to_reply, uri_to_post_rkey, uri_to_repost_rkey, AtriumClient},
-    Api, Session,
+    Api,
 };
 
 pub struct Client {
     api: Api,
     http_client: Arc<reqwest::Client>,
-    session: Option<Session>,
+    session: Option<com::atproto::server::create_session::Output>,
     pub identifier: String,
     password: String,
 }
@@ -41,16 +37,24 @@ impl Client {
         }
     }
 
-    fn as_atrium_client(&self) -> AtpServiceClient<AtpServiceWrapper<AtriumClient>> {
+    fn as_atrium_client(&self) -> AtpServiceClient<AtriumClient> {
         AtpServiceClient::new(AtriumClient::new(&self.http_client, &self.session))
     }
 
     async fn init_session(&mut self) -> Result<()> {
+        let input = com::atproto::server::create_session::Input {
+            identifier: self.identifier.clone(),
+            password: self.password.clone(),
+        };
         let session = self
-            .api
+            .as_atrium_client()
+            .service
+            .com
+            .atproto
             .server
-            .create_session(&self.http_client, &self.identifier, &self.password)
-            .await?;
+            .create_session(input)
+            .await
+            .map_err(|err| anyhow::anyhow!("{:?}", err))?;
         self.session = Some(session);
         Ok(())
     }

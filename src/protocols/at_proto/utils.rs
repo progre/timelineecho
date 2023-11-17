@@ -12,16 +12,19 @@ use crate::store::{self, operations::Facet::Link};
 
 use super::{
     repo::{Embed, External, Image, Record},
-    Api, Session,
+    Api,
 };
 
 pub struct AtriumClient<'a> {
     http_client: &'a reqwest::Client,
-    session: &'a Option<Session>,
+    session: &'a Option<com::atproto::server::create_session::Output>,
 }
 
 impl<'a> AtriumClient<'a> {
-    pub fn new(http_client: &'a reqwest::Client, session: &'a Option<Session>) -> Self {
+    pub fn new(
+        http_client: &'a reqwest::Client,
+        session: &'a Option<com::atproto::server::create_session::Output>,
+    ) -> Self {
         Self {
             http_client,
             session,
@@ -48,10 +51,10 @@ impl atrium_api::xrpc::HttpClient for AtriumClient<'_> {
 
 #[async_trait::async_trait]
 impl atrium_api::xrpc::XrpcClient for AtriumClient<'_> {
-    fn host(&self) -> &str {
+    fn base_uri(&self) -> &str {
         "https://bsky.social"
     }
-    fn auth(&self, is_refresh: bool) -> Option<String> {
+    async fn auth(&self, is_refresh: bool) -> Option<String> {
         self.session.as_ref().map(|session| {
             if is_refresh {
                 session.refresh_jwt.clone()
@@ -136,7 +139,7 @@ pub fn uri_to_repost_rkey(uri: &str) -> Result<String> {
 pub async fn to_embed(
     api: &Api,
     http_client: &reqwest::Client,
-    session: &Session,
+    session: &com::atproto::server::create_session::Output,
     images: Vec<store::operations::Medium>,
     external: Option<store::operations::External>,
 ) -> Result<Option<Embed>> {
@@ -196,7 +199,7 @@ pub async fn to_embed(
 pub async fn find_reply_root(
     api: &Api,
     http_client: &reqwest::Client,
-    session: &Session,
+    session: &com::atproto::server::create_session::Output,
     rkey: &str,
 ) -> Result<Option<com::atproto::repo::strong_ref::Main>> {
     let record = api.repo.get_record(http_client, session, rkey).await?;
@@ -213,7 +216,7 @@ pub async fn find_reply_root(
 pub async fn to_reply<'a>(
     api: &Api,
     http_client: &reqwest::Client,
-    session: &Session,
+    session: &com::atproto::server::create_session::Output,
     reply_identifier: Option<&str>,
 ) -> Result<Option<ReplyRef>> {
     let Some(reply_identifier) = reply_identifier else {

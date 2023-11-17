@@ -56,7 +56,7 @@ impl Repo {
     pub async fn create_record(
         &self,
         client: &reqwest::Client,
-        session: &Session,
+        session: &com::atproto::server::create_session::Output,
         record: Record<'_>,
     ) -> Result<Value> {
         let lexicon_id = "com.atproto.repo.createRecord";
@@ -77,7 +77,7 @@ impl Repo {
     pub async fn delete_record(
         &self,
         client: &reqwest::Client,
-        session: &Session,
+        session: &com::atproto::server::create_session::Output,
         rkey: &str,
     ) -> Result<()> {
         let lexicon_id = "com.atproto.repo.deleteRecord";
@@ -110,7 +110,7 @@ impl Repo {
     pub async fn get_record(
         &self,
         client: &reqwest::Client,
-        session: &Session,
+        session: &com::atproto::server::create_session::Output,
         rkey: &str,
     ) -> Result<com::atproto::repo::get_record::Output> {
         let token = &session.access_jwt;
@@ -139,7 +139,7 @@ impl Repo {
     pub async fn upload_blob(
         &self,
         client: &reqwest::Client,
-        session: &Session,
+        session: &com::atproto::server::create_session::Output,
         content_type: String,
         body: impl Into<Body>,
     ) -> Result<Value> {

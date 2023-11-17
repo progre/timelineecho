@@ -3,17 +3,15 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use tracing::error;
 
-use self::{repo::Repo, server::Server};
+use self::repo::Repo;
 
 pub mod from_atrium;
 pub mod repo;
-pub mod server;
 pub mod utils;
 
 pub struct Api {
     pub origin: String,
     pub repo: Repo,
-    pub server: Server,
 }
 
 impl Api {
@@ -21,7 +19,6 @@ impl Api {
         Self {
             origin: origin.clone(),
             repo: Repo::new(origin.clone()),
-            server: Server::new(origin),
         }
     }
 }
