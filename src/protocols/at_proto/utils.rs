@@ -51,8 +51,8 @@ impl atrium_api::xrpc::HttpClient for AtriumClient<'_> {
 
 #[async_trait::async_trait]
 impl atrium_api::xrpc::XrpcClient for AtriumClient<'_> {
-    fn base_uri(&self) -> &str {
-        "https://bsky.social"
+    fn base_uri(&self) -> String {
+        "https://bsky.social".into()
     }
     async fn auth(&self, is_refresh: bool) -> Option<String> {
         self.session.as_ref().map(|session| {

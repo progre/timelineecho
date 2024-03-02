@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 async-trait = "0.1.68"
-atrium-api = "0.13.0"
+atrium-api = "0.16.0"
 aws-config = "0.55.3"
 aws_lambda_events = { version = "0.10.0", default-features = false, features = [
   "cloudwatch_events"
