@@ -4,7 +4,9 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset};
 use linkify::LinkFinder;
+use reqwest::multipart::{Form, Part};
 use serde_json::{json, Value};
+use tracing::trace;
 
 use crate::{sources::source, store};
 
@@ -55,13 +57,12 @@ impl Client {
         origin: String,
         access_token: String,
     ) -> Result<Self> {
-        let json: Value = http_client
+        let resp = http_client
             .post(format!("{}/api/i", origin))
             .json(&json!({ "i": access_token }))
             .send()
-            .await?
-            .json()
             .await?;
+        let json: Value = resp.json().await?;
         let user_id = get_as_string(&json, "id")?;
         Ok(Self {
             http_client,
@@ -83,14 +84,14 @@ impl super::Client for Client {
     }
 
     async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
-        let json: Value = self
+        let resp = self
             .http_client
             .post(format!("{}/api/users/notes", self.origin))
-            .json(&json!({ "i": self.access_token, "userId": self.user_id, "limit": 100 }))
+            .bearer_auth(self.access_token.to_owned())
+            .json(&json!({ "userId": self.user_id, "limit": 100 }))
             .send()
-            .await?
-            .json()
             .await?;
+        let json: Value = resp.json().await?;
         let root = json
             .as_array()
             .ok_or_else(|| anyhow!("root is not array"))?;
@@ -149,35 +150,111 @@ impl super::Client for Client {
             .collect::<Result<Vec<_>>>()?)
     }
 
-    #[allow(unused)]
     async fn post(
         &mut self,
         content: &str,
-        facets: &[store::operations::Facet],
+        _facets: &[store::operations::Facet],
         reply_identifier: Option<&str>,
         images: Vec<store::operations::Medium>,
-        external: Option<store::operations::External>,
-        created_at: &DateTime<FixedOffset>,
+        _external: Option<store::operations::External>,
+        _created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
-        todo!();
+        let mut json = json!({
+            "replyId": reply_identifier,
+            "text": content,
+        });
+        if !images.is_empty() {
+            let mut media_ids = Vec::new();
+            for image in images {
+                let resp = self.http_client.get(image.url).send().await?;
+                trace!("{:?}", resp);
+                let multipart = Form::new().part("file", Part::stream(resp).file_name("file.jpg"));
+                let url = format!("{}/api/drive/files/create", self.origin);
+                let resp = self
+                    .http_client
+                    .post(url)
+                    .bearer_auth(self.access_token.to_owned())
+                    .multipart(multipart)
+                    .send()
+                    .await?;
+                let json: Value = resp.json().await?;
+                let media_id = json
+                    .get("id")
+                    .ok_or_else(|| anyhow!("id is not found"))?
+                    .as_str()
+                    .ok_or_else(|| anyhow!("id is not str"))?;
+                media_ids.push(media_id.to_owned());
+            }
+            json["mediaIds"] = media_ids.into();
+        }
+        let resp = self
+            .http_client
+            .post(format!("{}/api/notes/create", self.origin))
+            .bearer_auth(self.access_token.to_owned())
+            .json(&json)
+            .send()
+            .await?;
+        let json: Value = resp.json().await?;
+        trace!("resp: {}", serde_json::to_string_pretty(&json)?);
+        json.as_object()
+            .ok_or_else(|| anyhow!("root is not object"))?
+            .get("createdNote")
+            .ok_or_else(|| anyhow!("createdNote is not found"))?
+            .as_object()
+            .ok_or_else(|| anyhow!("createdNote is not object"))?
+            .get("id")
+            .ok_or_else(|| anyhow!("id is not found"))?
+            .as_str()
+            .ok_or_else(|| anyhow!("id is not str"))
+            .map(str::to_owned)
     }
 
-    #[allow(unused)]
     async fn repost(
         &mut self,
         target_identifier: &str,
-        created_at: &DateTime<FixedOffset>,
+        _created_at: &DateTime<FixedOffset>,
     ) -> Result<String> {
-        todo!();
+        let resp = self
+            .http_client
+            .post(format!("{}/api/notes/create", self.origin))
+            .bearer_auth(self.access_token.to_owned())
+            .json(&json!({ "renoteId": target_identifier }))
+            .send()
+            .await?;
+        let json: Value = resp.json().await?;
+        trace!("resp: {}", serde_json::to_string_pretty(&json)?);
+        json.as_object()
+            .ok_or_else(|| anyhow!("root is not object"))?
+            .get("createdNote")
+            .ok_or_else(|| anyhow!("createdNote is not found"))?
+            .as_object()
+            .ok_or_else(|| anyhow!("createdNote is not object"))?
+            .get("renoteId")
+            .ok_or_else(|| anyhow!("renoteId is not found"))?
+            .as_str()
+            .ok_or_else(|| anyhow!("renoteId is not str"))
+            .map(str::to_owned)
     }
 
-    #[allow(unused)]
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
-        todo!();
+        let resp = self
+            .http_client
+            .post(format!("{}/api/notes/delete", self.origin))
+            .bearer_auth(self.access_token.to_owned())
+            .json(&json!({ "noteId": identifier }))
+            .send()
+            .await?;
+        resp.error_for_status().map(|_| ()).map_err(|e| e.into())
     }
 
-    #[allow(unused)]
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
-        todo!();
+        let resp = self
+            .http_client
+            .post(format!("{}/api/notes/unrenote", self.origin))
+            .bearer_auth(self.access_token.to_owned())
+            .json(&json!({ "noteId": identifier }))
+            .send()
+            .await?;
+        resp.error_for_status().map(|_| ()).map_err(|e| e.into())
     }
 }
