@@ -2,6 +2,7 @@ use std::{collections::HashMap, time::Duration};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use aws_config::BehaviorVersion;
 use config::FileFormat;
 use serde::{Deserialize, Serialize};
 use serde_dynamo::{from_item, to_attribute_value, to_item};
@@ -58,7 +59,7 @@ pub struct DynamoDB {
 
 impl DynamoDB {
     pub async fn new() -> Self {
-        let config = aws_config::load_from_env().await;
+        let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
         let client = aws_sdk_dynamodb::Client::new(&config);
         Self { client }
     }

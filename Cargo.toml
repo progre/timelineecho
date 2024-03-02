@@ -8,24 +8,24 @@ edition = "2021"
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 async-trait = "0.1.68"
 atrium-api = "0.16.0"
-aws-config = "0.55.3"
-aws_lambda_events = { version = "0.10.0", default-features = false, features = [
+aws-config = "1.1.7"
+aws_lambda_events = { version = "0.15.0", default-features = false, features = [
   "cloudwatch_events"
 ] }
-aws-sdk-dynamodb = "0.28.0"
+aws-sdk-dynamodb = "1.16.0"
 chrono = "0.4.26"
 config = { version = "0.14.0", default-features = false, features = ["json5"] }
 futures = "0.3.28"
 html2text = "0.12.2"
 http = "0.2"
-lambda_runtime = "0.8.1"
+lambda_runtime = "0.10.0"
 linkify = "0.10.0"
 megalodon = "0.12.4"
 oauth1-request = "0.6.0"
 regex = "1.8.4"
 reqwest = { version = "0.11.24", features = ["json"] }
 serde = { version = "1.0.164", features = ["derive"] }
-serde_dynamo = { version = "4.2.3", features = ["aws-sdk-dynamodb+0_28"] }
+serde_dynamo = { version = "4.2.13", features = ["aws-sdk-dynamodb+1"] }
 serde_json = "1.0.97"
 time = { version = "0.3.22", features = ["formatting"] }
 tokio = { version = "1.28.2", features = ["rt-multi-thread", "macros", "time"] }
