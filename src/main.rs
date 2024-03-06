@@ -15,11 +15,12 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-fn default_subscriber_builder() -> SubscriberBuilder<DefaultFields, Format, EnvFilter> {
-    tracing_subscriber::fmt().with_env_filter(
-        EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| EnvFilter::from("timelineecho=trace,reqwest=trace")),
-    )
+fn default_subscriber_builder(
+    log_level: &str,
+) -> SubscriberBuilder<DefaultFields, Format, EnvFilter> {
+    let s = format!("timelineecho={},reqwest={}", log_level, log_level);
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::from(&s)))
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -41,7 +42,7 @@ mod local {
                 decimal_digits: NonZeroU8::new(6),
             })
             .encode();
-        default_subscriber_builder()
+        default_subscriber_builder("trace")
             .with_timer(LocalTime::new(Iso8601::<MY_CONFIG>))
             .compact()
             .init();
@@ -61,7 +62,7 @@ mod lambda {
     use crate::{app::app, database, default_subscriber_builder};
 
     pub fn init_tracing() {
-        default_subscriber_builder()
+        default_subscriber_builder("debug")
             .without_time()
             .with_ansi(false)
             .with_target(false)
