@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Result};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
     app::AccountKey,
@@ -56,7 +56,10 @@ pub async fn post(
         let result = match operation {
             CreatePost(operation) => create_post(store, dst_client, operation).await,
             CreateRepost(operation) => create_repost(store, dst_client, operation).await,
-            UpdatePost(_) => todo!(),
+            UpdatePost(_) => {
+                warn!("Update is not supported yet");
+                Ok(())
+            }
             DeletePost(operation) => delete_post(store, dst_client, operation).await,
             DeleteRepost(operation) => delete_repost(store, dst_client, operation).await,
         };

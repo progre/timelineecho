@@ -1,3 +1,5 @@
+use tracing::warn;
+
 use super::source::Operation;
 use crate::{
     app::AccountKey,
@@ -92,7 +94,7 @@ pub fn merge_operations(
     src_operations
         .iter()
         .filter_map(to_update_post_operation_status)
-        .for_each(|_| todo!("もし create が未送信なら、create を書き換える必要がある"));
+        .for_each(|_| warn!("もし create が未送信なら、create を書き換える必要がある"));
     // 投稿の削除を適用
     let deleting_post_full_identifiers: Vec<_> = src_operations
         .iter()
