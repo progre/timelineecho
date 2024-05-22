@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use atrium_api::{
     app::{self, bsky::feed::post::ReplyRef},
     com,
+    records::KnownRecord,
 };
 use chrono::{DateTime, FixedOffset};
 use regex::Regex;
@@ -14,56 +15,6 @@ use super::{
     repo::{Embed, External, Image, Record},
     Api,
 };
-
-pub struct AtriumClient<'a> {
-    http_client: &'a reqwest::Client,
-    session: &'a Option<com::atproto::server::create_session::Output>,
-}
-
-impl<'a> AtriumClient<'a> {
-    pub fn new(
-        http_client: &'a reqwest::Client,
-        session: &'a Option<com::atproto::server::create_session::Output>,
-    ) -> Self {
-        Self {
-            http_client,
-            session,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl atrium_api::xrpc::HttpClient for AtriumClient<'_> {
-    async fn send_http(
-        &self,
-        req: http::Request<Vec<u8>>,
-    ) -> Result<http::Response<Vec<u8>>, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let resp = self.http_client.execute(req.try_into()?).await?;
-        let mut builder = http::Response::builder().status(resp.status());
-        for (k, v) in resp.headers() {
-            builder = builder.header(k, v);
-        }
-        builder
-            .body(resp.bytes().await?.to_vec())
-            .map_err(Into::into)
-    }
-}
-
-#[async_trait::async_trait]
-impl atrium_api::xrpc::XrpcClient for AtriumClient<'_> {
-    fn base_uri(&self) -> String {
-        "https://bsky.social".into()
-    }
-    async fn auth(&self, is_refresh: bool) -> Option<String> {
-        self.session.as_ref().map(|session| {
-            if is_refresh {
-                session.refresh_jwt.clone()
-            } else {
-                session.access_jwt.clone()
-            }
-        })
-    }
-}
 
 pub fn to_record<'a>(
     text: &'a str,
@@ -203,7 +154,8 @@ pub async fn find_reply_root(
     rkey: &str,
 ) -> Result<Option<com::atproto::repo::strong_ref::Main>> {
     let record = api.repo.get_record(http_client, session, rkey).await?;
-    let atrium_api::records::Record::AppBskyFeedPost(record) = record.value else {
+    let atrium_api::records::Record::Known(KnownRecord::AppBskyFeedPost(record)) = record.value
+    else {
         unreachable!();
     };
     let Some(reply) = record.reply else {

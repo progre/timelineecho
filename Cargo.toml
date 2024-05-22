@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 async-trait = "0.1.68"
-atrium-api = "0.16.0"
+atrium-api = "0.22.0"
 aws-config = "1.1.7"
 aws_lambda_events = { version = "0.15.0", default-features = false, features = [
   "cloudwatch_events"
@@ -17,7 +17,7 @@ chrono = "0.4.26"
 config = { version = "0.14.0", default-features = false, features = ["json5"] }
 futures = "0.3.28"
 html2text = "0.12.2"
-http = "0.2"
+http = "1.1.0"
 lambda_runtime = "0.10.0"
 linkify = "0.10.0"
 megalodon = "0.12.4"
@@ -36,6 +36,7 @@ tracing-subscriber = { version = "0.3.17", features = [
   "local-time"
 ] }
 webpage = "2.0.0"
+atrium-xrpc-client = "0.5.4"
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }

@@ -1,10 +1,14 @@
 use anyhow::{anyhow, Result};
-use atrium_api::app::{
-    self,
-    bsky::{
-        embed::{record::ViewRecordEnum, record_with_media::ViewMediaEnum},
-        feed::defs::{FeedViewPostReasonEnum, PostViewEmbedEnum},
+use atrium_api::{
+    app::{
+        self,
+        bsky::{
+            embed::{record::ViewRecordRefs, record_with_media::ViewMediaRefs},
+            feed::defs::{FeedViewPostReasonRefs, PostViewEmbedRefs},
+        },
     },
+    records::KnownRecord,
+    types::Union::{self, Refs, Unknown},
 };
 use chrono::DateTime;
 use regex::Regex;
@@ -18,18 +22,19 @@ impl TryFrom<app::bsky::richtext::facet::Main> for store::operations::Facet {
         assert_eq!(value.features.len(), 1);
         let feature = &value.features[0];
         match feature {
-            app::bsky::richtext::facet::MainFeaturesItem::Mention(mention) => {
+            Refs(app::bsky::richtext::facet::MainFeaturesItem::Mention(mention)) => {
                 Err(anyhow!("mention is not implemented: {:?}", mention))
             }
-            app::bsky::richtext::facet::MainFeaturesItem::Link(link) => {
+            Refs(app::bsky::richtext::facet::MainFeaturesItem::Link(link)) => {
                 Ok(store::operations::Facet::Link {
                     byte_slice: (value.index.byte_start as u32)..(value.index.byte_end as u32),
                     uri: link.uri.clone(),
                 })
             }
-            app::bsky::richtext::facet::MainFeaturesItem::Tag(tag) => {
+            Refs(app::bsky::richtext::facet::MainFeaturesItem::Tag(tag)) => {
                 Err(anyhow!("tag is not implemented: {:?}", tag))
             }
+            Unknown(_) => Err(anyhow!("unknown feature type")),
         }
     }
 }
@@ -79,18 +84,16 @@ fn rewrite_content(
                 .features
                 .iter()
                 .filter_map(|x| match x {
-                    app::bsky::richtext::facet::MainFeaturesItem::Link(link) => Some(link),
-                    app::bsky::richtext::facet::MainFeaturesItem::Mention(_) => None,
-                    app::bsky::richtext::facet::MainFeaturesItem::Tag(_) => None,
+                    Refs(app::bsky::richtext::facet::MainFeaturesItem::Link(link)) => Some(link),
+                    Refs(app::bsky::richtext::facet::MainFeaturesItem::Mention(_)) => None,
+                    Refs(app::bsky::richtext::facet::MainFeaturesItem::Tag(_)) => None,
+                    Unknown(_) => None,
                 })
                 .next()
             else {
                 continue;
             };
-            content.replace_range(
-                (facet.index.byte_start as usize)..(facet.index.byte_end as usize),
-                &link.uri,
-            );
+            content.replace_range(facet.index.byte_start..facet.index.byte_end, &link.uri);
         }
     }
     if let Some(quote) = quote {
@@ -103,55 +106,62 @@ fn rewrite_content(
 }
 
 fn parse_embed(
-    embed: Option<PostViewEmbedEnum>,
+    embed: Option<Union<PostViewEmbedRefs>>,
 ) -> (
     Vec<store::operations::Medium>,
     source::LiveExternal,
     Option<String>,
 ) {
     match embed {
-        Some(PostViewEmbedEnum::AppBskyEmbedImagesView(images)) => (
+        Some(Union::Refs(PostViewEmbedRefs::AppBskyEmbedImagesView(images))) => (
             images.images.into_iter().map(|x| x.into()).collect(),
             source::LiveExternal::None,
             None,
         ),
-        Some(PostViewEmbedEnum::AppBskyEmbedExternalView(external)) => {
+        Some(Union::Refs(PostViewEmbedRefs::AppBskyEmbedExternalView(external))) => {
             (vec![], external.into(), None)
         }
-        Some(PostViewEmbedEnum::AppBskyEmbedRecordView(embed)) => match embed.record {
-            ViewRecordEnum::ViewRecord(record) => (
+        Some(Union::Refs(PostViewEmbedRefs::AppBskyEmbedRecordView(embed))) => match embed.record {
+            Refs(ViewRecordRefs::ViewRecord(record)) => (
                 vec![],
                 source::LiveExternal::None,
                 Some(to_external_uri(&record.uri)),
             ),
-            ViewRecordEnum::ViewNotFound(_)
-            | ViewRecordEnum::ViewBlocked(_)
-            | ViewRecordEnum::AppBskyFeedDefsGeneratorView(_)
-            | ViewRecordEnum::AppBskyGraphDefsListView(_) => {
-                (vec![], source::LiveExternal::None, None)
-            }
+            Refs(
+                ViewRecordRefs::ViewNotFound(_)
+                | ViewRecordRefs::ViewBlocked(_)
+                | ViewRecordRefs::AppBskyFeedDefsGeneratorView(_)
+                | ViewRecordRefs::AppBskyGraphDefsListView(_)
+                | ViewRecordRefs::AppBskyLabelerDefsLabelerView(_),
+            )
+            | Unknown(_) => (vec![], source::LiveExternal::None, None),
         },
-        Some(PostViewEmbedEnum::AppBskyEmbedRecordWithMediaView(embed)) => {
+        Some(Union::Refs(PostViewEmbedRefs::AppBskyEmbedRecordWithMediaView(embed))) => {
             let (media, external) = match embed.media {
-                ViewMediaEnum::AppBskyEmbedImagesView(images) => (
+                Refs(ViewMediaRefs::AppBskyEmbedImagesView(images)) => (
                     images.images.into_iter().map(|x| x.into()).collect(),
                     source::LiveExternal::None,
                 ),
-                ViewMediaEnum::AppBskyEmbedExternalView(external) => (vec![], external.into()),
+                Refs(ViewMediaRefs::AppBskyEmbedExternalView(external)) => {
+                    (vec![], external.into())
+                }
+                Unknown(_) => (vec![], source::LiveExternal::None),
             };
             match embed.record.record {
-                ViewRecordEnum::ViewRecord(record) => {
+                Refs(ViewRecordRefs::ViewRecord(record)) => {
                     (media, external, Some(to_external_uri(&record.uri)))
                 }
-                ViewRecordEnum::ViewNotFound(_)
-                | ViewRecordEnum::ViewBlocked(_)
-                | ViewRecordEnum::AppBskyFeedDefsGeneratorView(_)
-                | ViewRecordEnum::AppBskyGraphDefsListView(_) => {
-                    (vec![], source::LiveExternal::None, None)
-                }
+                Refs(
+                    ViewRecordRefs::ViewNotFound(_)
+                    | ViewRecordRefs::ViewBlocked(_)
+                    | ViewRecordRefs::AppBskyFeedDefsGeneratorView(_)
+                    | ViewRecordRefs::AppBskyGraphDefsListView(_)
+                    | ViewRecordRefs::AppBskyLabelerDefsLabelerView(_),
+                )
+                | Unknown(_) => (vec![], source::LiveExternal::None, None),
             }
         }
-        None => (vec![], source::LiveExternal::None, None),
+        Some(Union::Unknown(_)) | None => (vec![], source::LiveExternal::None, None),
     }
 }
 
@@ -159,17 +169,21 @@ impl TryFrom<app::bsky::feed::defs::FeedViewPost> for source::LiveStatus {
     type Error = anyhow::Error;
 
     fn try_from(value: app::bsky::feed::defs::FeedViewPost) -> Result<Self> {
-        let atrium_api::records::Record::AppBskyFeedPost(record) = value.post.record else {
+        let atrium_api::records::Record::Known(KnownRecord::AppBskyFeedPost(record)) =
+            value.post.record
+        else {
             unreachable!()
         };
         let (media, external, quote) = parse_embed(value.post.embed);
         Ok(
-            if let Some(FeedViewPostReasonEnum::ReasonRepost(reason)) = value.reason {
+            if let Some(Union::Refs(FeedViewPostReasonRefs::ReasonRepost(reason))) = value.reason {
                 source::LiveStatus::Repost(store::operations::CreateRepostOperationStatus {
-                    src_identifier: value.post.cid.clone(),
-                    target_src_identifier: value.post.cid.clone(),
+                    src_identifier: value.post.cid.as_ref().to_string(),
+                    target_src_identifier: value.post.cid.as_ref().to_string(),
                     target_src_uri: to_external_uri(&value.post.uri),
-                    created_at: DateTime::parse_from_rfc3339(&reason.indexed_at)?,
+                    created_at: DateTime::parse_from_rfc3339(
+                        &reason.indexed_at.as_ref().to_rfc3339(),
+                    )?,
                 })
             } else {
                 let facets = record
@@ -179,7 +193,7 @@ impl TryFrom<app::bsky::feed::defs::FeedViewPost> for source::LiveStatus {
                     .filter_map(|x| x.to_owned().try_into().ok())
                     .collect();
                 source::LiveStatus::Post(source::LivePost {
-                    identifier: value.post.cid.clone(),
+                    identifier: value.post.cid.as_ref().to_string(),
                     uri: value.post.uri.clone(),
                     content: rewrite_content(
                         record.text.to_owned(),
@@ -187,10 +201,12 @@ impl TryFrom<app::bsky::feed::defs::FeedViewPost> for source::LiveStatus {
                         quote.as_deref(),
                     ),
                     facets,
-                    reply_src_identifier: record.reply.map(|x| x.parent.cid),
+                    reply_src_identifier: record.reply.map(|x| x.parent.cid.as_ref().to_string()),
                     media,
                     external,
-                    created_at: DateTime::parse_from_rfc3339(&record.created_at)?,
+                    created_at: DateTime::parse_from_rfc3339(
+                        &record.created_at.as_ref().to_rfc3339(),
+                    )?,
                 })
             },
         )

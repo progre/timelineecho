@@ -59,12 +59,15 @@ pub async fn create_client(
             origin,
             identifier,
             password,
-        } => Ok(Box::new(at_proto_client::Client::new(
-            origin.into(),
-            http_client,
-            identifier.into(),
-            password.into(),
-        ))),
+        } => Ok(Box::new(
+            at_proto_client::Client::new(
+                origin.into(),
+                http_client,
+                identifier.into(),
+                password.into(),
+            )
+            .await?,
+        )),
         config::Account::Mastodon {
             origin,
             access_token,

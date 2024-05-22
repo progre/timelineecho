@@ -46,7 +46,7 @@ async fn upload_media(
         .post(format!("{}{}", origin, "/api/v2/media"))
         .bearer_auth(access_token)
         .multipart(form)
-        .header(ACCEPT, "application/json")
+        .header(ACCEPT.as_str(), "application/json")
         .send()
         .await?;
     let status_code = resp.status().as_u16();

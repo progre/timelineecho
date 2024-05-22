@@ -1,19 +1,26 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use atrium_api::{app, client::AtpServiceClient, com};
+use atrium_api::{
+    agent::{store::MemorySessionStore, AtpAgent},
+    app, com,
+    records::KnownRecord,
+    types::string::{Datetime, Nsid},
+};
+use atrium_xrpc_client::reqwest::ReqwestClient;
 use chrono::{DateTime, FixedOffset};
 use serde_json::Value;
 
 use crate::{sources::source, store};
 
 use super::at_proto::{
-    utils::{to_embed, to_record, to_reply, uri_to_post_rkey, uri_to_repost_rkey, AtriumClient},
+    utils::{to_embed, to_record, to_reply, uri_to_post_rkey, uri_to_repost_rkey},
     Api,
 };
 
 pub struct Client {
+    agent: AtpAgent<MemorySessionStore, ReqwestClient>,
     api: Api,
     http_client: Arc<reqwest::Client>,
     session: Option<com::atproto::server::create_session::Output>,
@@ -22,33 +29,36 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn new(
+    pub async fn new(
         origin: String,
         http_client: Arc<reqwest::Client>,
         identifier: String,
         password: String,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let agent = AtpAgent::new(
+            ReqwestClient::new("https://bsky.social"),
+            MemorySessionStore::default(),
+        );
+        agent.login(&identifier, &password).await?;
+        Ok(Self {
+            agent,
             api: Api::new(origin),
             http_client,
             session: None,
             identifier,
             password,
-        }
-    }
-
-    fn as_atrium_client(&self) -> AtpServiceClient<AtriumClient> {
-        AtpServiceClient::new(AtriumClient::new(&self.http_client, &self.session))
+        })
     }
 
     async fn init_session(&mut self) -> Result<()> {
         let input = com::atproto::server::create_session::Input {
             identifier: self.identifier.clone(),
             password: self.password.clone(),
+            auth_factor_token: None,
         };
         let session = self
-            .as_atrium_client()
-            .service
+            .agent
+            .api
             .com
             .atproto
             .server
@@ -80,14 +90,14 @@ impl super::Client for Client {
         };
 
         let params = app::bsky::feed::get_author_feed::Parameters {
-            actor: session.did.clone(),
+            actor: session.did.clone().into(),
             cursor: None,
             filter: None,
             limit: None,
         };
         let output = self
-            .as_atrium_client()
-            .service
+            .agent
+            .api
             .app
             .bsky
             .feed
@@ -140,25 +150,25 @@ impl super::Client for Client {
 
         let identifier: com::atproto::repo::create_record::Output =
             serde_json::from_str(target_identifier)?;
-        let record = atrium_api::records::Record::AppBskyFeedRepost(Box::new(
+        let record = atrium_api::records::Record::Known(KnownRecord::AppBskyFeedRepost(Box::new(
             app::bsky::feed::repost::Record {
-                created_at: created_at.to_rfc3339(),
+                created_at: Datetime::new(created_at.to_owned()),
                 subject: com::atproto::repo::strong_ref::Main {
                     cid: identifier.cid,
                     uri: identifier.uri,
                 },
             },
-        ));
+        )));
         let res = self
-            .as_atrium_client()
-            .service
+            .agent
+            .api
             .com
             .atproto
             .repo
             .create_record(com::atproto::repo::create_record::Input {
-                collection: "app.bsky.feed.repost".into(),
+                collection: Nsid::from_str("app.bsky.feed.repost").unwrap(),
                 record,
-                repo: session.did.clone(),
+                repo: session.did.clone().into(),
                 rkey: None,
                 swap_commit: None,
                 validate: None,
@@ -205,14 +215,14 @@ impl super::Client for Client {
         };
 
         let input = com::atproto::repo::delete_record::Input {
-            collection: "app.bsky.feed.repost".into(),
-            repo: session.did.clone(),
+            collection: Nsid::from_str("app.bsky.feed.repost").unwrap(),
+            repo: session.did.clone().into(),
             rkey,
             swap_commit: None,
             swap_record: None,
         };
-        self.as_atrium_client()
-            .service
+        self.agent
+            .api
             .com
             .atproto
             .repo
