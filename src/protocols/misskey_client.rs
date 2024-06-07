@@ -52,6 +52,7 @@ pub struct Client {
 }
 
 impl Client {
+    #[tracing::instrument(name = "misskey_client::Client::new", skip_all)]
     pub async fn new(
         http_client: Arc<reqwest::Client>,
         origin: String,
@@ -83,6 +84,7 @@ impl super::Client for Client {
         &self.user_id
     }
 
+    #[tracing::instrument(name = "misskey_client::Client::fetch_statuses", skip_all)]
     async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         let resp = self
             .http_client
@@ -150,6 +152,7 @@ impl super::Client for Client {
             .collect::<Result<Vec<_>>>()?)
     }
 
+    #[tracing::instrument(name = "misskey_client::Client::post", skip_all)]
     async fn post(
         &mut self,
         content: &str,
@@ -209,6 +212,7 @@ impl super::Client for Client {
             .map(str::to_owned)
     }
 
+    #[tracing::instrument(name = "misskey_client::Client::repost", skip_all)]
     async fn repost(
         &mut self,
         target_identifier: &str,
@@ -236,6 +240,7 @@ impl super::Client for Client {
             .map(str::to_owned)
     }
 
+    #[tracing::instrument(name = "misskey_client::Client::delete_post", skip_all)]
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         let resp = self
             .http_client
@@ -247,6 +252,7 @@ impl super::Client for Client {
         resp.error_for_status().map(|_| ()).map_err(|e| e.into())
     }
 
+    #[tracing::instrument(name = "misskey_client::Client::delete_repost", skip_all)]
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let resp = self
             .http_client

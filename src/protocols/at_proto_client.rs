@@ -29,6 +29,7 @@ pub struct Client {
 }
 
 impl Client {
+    #[tracing::instrument(name = "at_proto_client::Client::new", skip_all)]
     pub async fn new(
         origin: String,
         http_client: Arc<reqwest::Client>,
@@ -50,6 +51,7 @@ impl Client {
         })
     }
 
+    #[tracing::instrument(name = "at_proto_client::Client::init_session", skip_all)]
     async fn init_session(&mut self) -> Result<()> {
         let input = com::atproto::server::create_session::Input {
             identifier: self.identifier.clone(),
@@ -80,6 +82,7 @@ impl super::Client for Client {
         &self.identifier
     }
 
+    #[tracing::instrument(name = "at_proto_client::Client::fetch_statuses", skip_all)]
     async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         let session = match &self.session {
             Some(some) => some,
@@ -107,6 +110,7 @@ impl super::Client for Client {
         output.feed.into_iter().map(|x| x.try_into()).collect()
     }
 
+    #[tracing::instrument(name = "at_proto_client::Client::post", skip_all)]
     async fn post(
         &mut self,
         content: &str,
@@ -135,6 +139,7 @@ impl super::Client for Client {
         Ok(serde_json::to_string(&output)?)
     }
 
+    #[tracing::instrument(name = "at_proto_client::Client::repost", skip_all)]
     async fn repost(
         &mut self,
         target_identifier: &str,
@@ -178,6 +183,7 @@ impl super::Client for Client {
         Ok(serde_json::to_string(&res)?)
     }
 
+    #[tracing::instrument(name = "at_proto_client::Client::delete_post", skip_all)]
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         let json: Value = serde_json::from_str(identifier)?;
         let uri = json
@@ -202,6 +208,7 @@ impl super::Client for Client {
         Ok(())
     }
 
+    #[tracing::instrument(name = "at_proto_client::Client::delete_repost", skip_all)]
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let output: com::atproto::repo::put_record::Output = serde_json::from_str(identifier)?;
         let rkey = uri_to_repost_rkey(&output.uri)?;

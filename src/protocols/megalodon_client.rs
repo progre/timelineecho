@@ -109,6 +109,7 @@ pub struct Client {
 }
 
 impl Client {
+    #[tracing::instrument(name = "megalodon_client::Client::new", skip_all)]
     pub async fn new_mastodon(origin: String, access_token: String) -> Result<Self> {
         let megalodon = megalodon::generator(
             megalodon::SNS::Mastodon,
@@ -139,6 +140,7 @@ impl super::Client for Client {
         &self.account_id
     }
 
+    #[tracing::instrument(name = "megalodon_client::Client::fetch_statuses", skip_all)]
     async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         let resp = self
             .megalodon
@@ -161,6 +163,7 @@ impl super::Client for Client {
         Ok(statuses)
     }
 
+    #[tracing::instrument(name = "megalodon_client::Client::post", skip_all)]
     async fn post(
         &mut self,
         content: &str,
@@ -189,6 +192,7 @@ impl super::Client for Client {
         }
     }
 
+    #[tracing::instrument(name = "megalodon_client::Client::repost", skip_all)]
     async fn repost(
         &mut self,
         target_identifier: &str,
@@ -201,6 +205,7 @@ impl super::Client for Client {
         Ok(res.json().id)
     }
 
+    #[tracing::instrument(name = "megalodon_client::Client::delete_post", skip_all)]
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         let result = self.megalodon.delete_status(identifier.to_owned()).await;
         debug!("megalodon delete_post: {:?}", result);
@@ -220,6 +225,7 @@ impl super::Client for Client {
         }
     }
 
+    #[tracing::instrument(name = "megalodon_client::Client::delete_repost", skip_all)]
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let result = self.megalodon.delete_status(identifier.to_owned()).await;
         debug!("megalodon delete_repost: {:?}", result);

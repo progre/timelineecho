@@ -67,6 +67,7 @@ impl DynamoDB {
 
 #[async_trait]
 impl Database for DynamoDB {
+    #[tracing::instrument(name = "dynamodb::Database::config", skip_all)]
     async fn config(&self) -> Result<Config> {
         let item = self
             .client
@@ -82,6 +83,7 @@ impl Database for DynamoDB {
         Ok(serde_json::from_str(&root.config_json)?)
     }
 
+    #[tracing::instrument(name = "dynamodb::Database::fetch", skip_all)]
     async fn fetch(&self) -> Result<store::Store> {
         let item = self
             .client
@@ -97,6 +99,7 @@ impl Database for DynamoDB {
         Ok(root.store)
     }
 
+    #[tracing::instrument(name = "dynamodb::Database::commit", skip_all)]
     async fn commit(&self, store: &store::Store) -> Result<()> {
         info!("commit to dynamodb...");
         let store = DynamoDBRoot {

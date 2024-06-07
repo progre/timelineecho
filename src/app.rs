@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Ok, Result};
 use tokio::{spawn, time::sleep};
@@ -62,18 +58,12 @@ pub async fn app(database: impl Database) -> Result<()> {
         }
     });
     spawn(async move {
-        let start = Instant::now();
         let config = database.config().await?;
-        debug!("config elapsed: {} ms", start.elapsed().as_millis());
-        let start = Instant::now();
         let mut store = database.fetch().await.unwrap_or_default();
-        debug!("fetch elapsed: {} ms", start.elapsed().as_millis());
 
         let main_result = do_main_task(&cancellation_token, &config, &mut store).await;
 
-        let start = Instant::now();
         let commit_result = database.commit(&store).await;
-        debug!("commit elapsed: {} ms", start.elapsed().as_millis());
         if let Err(main_error) = main_result {
             if let Err(commit_error) = commit_result {
                 error!("commit error: {:?}", commit_error);

@@ -19,6 +19,7 @@ pub struct Client {
 }
 
 impl Client {
+    #[tracing::instrument(name = "twitter_client::Client::new", skip_all)]
     pub async fn new(
         http_client: Arc<reqwest::Client>,
         api_key: String,
@@ -59,10 +60,12 @@ impl super::Client for Client {
         &self.user_id
     }
 
+    #[tracing::instrument(name = "twitter_client::Client::fetch_statuses", skip_all)]
     async fn fetch_statuses(&mut self) -> Result<Vec<source::LiveStatus>> {
         todo!()
     }
 
+    #[tracing::instrument(name = "twitter_client::Client::post", skip_all)]
     async fn post(
         &mut self,
         content: &str,
@@ -100,9 +103,9 @@ impl super::Client for Client {
         let body = TweetBody {
             media,
             quote_tweet_id: None,
-            reply: reply_identifier.map(|reply_identifier| {
-                serde_json::json!({ "in_reply_to_tweet_id": reply_identifier })
-            }),
+            reply: reply_identifier.map(
+                |reply_identifier| serde_json::json!({ "in_reply_to_tweet_id": reply_identifier }),
+            ),
             text: content,
         };
 
@@ -119,6 +122,7 @@ impl super::Client for Client {
         Ok(id.to_owned())
     }
 
+    #[tracing::instrument(name = "twitter_client::Client::repost", skip_all)]
     async fn repost(
         &mut self,
         target_identifier: &str,
@@ -148,11 +152,13 @@ impl super::Client for Client {
         Ok(id.to_owned())
     }
 
+    #[tracing::instrument(name = "twitter_client::Client::delete_post", skip_all)]
     async fn delete_post(&mut self, identifier: &str) -> Result<()> {
         let _: Value = self.api.delete_tweet(identifier).await?;
         Ok(())
     }
 
+    #[tracing::instrument(name = "twitter_client::Client::delete_repost", skip_all)]
     async fn delete_repost(&mut self, identifier: &str) -> Result<()> {
         let target_identifier = identifier;
         let result = self

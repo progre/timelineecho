@@ -9,18 +9,30 @@ mod utils;
 
 use tracing_subscriber::{
     fmt::{
-        format::{DefaultFields, Format},
+        format::{DefaultFields, FmtSpan, Format, Full, Writer},
+        time::FormatTime,
         SubscriberBuilder,
     },
     EnvFilter,
 };
 
+struct NoTime;
+
+impl FormatTime for NoTime {
+    fn format_time(&self, _writer: &mut Writer<'_>) -> std::fmt::Result {
+        Ok(())
+    }
+}
+
 fn default_subscriber_builder(
     log_level: &str,
-) -> SubscriberBuilder<DefaultFields, Format, EnvFilter> {
+) -> SubscriberBuilder<DefaultFields, Format<Full, NoTime>, EnvFilter> {
     let s = format!("timelineecho={},reqwest={}", log_level, log_level);
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::from(&s)))
+        .with_span_events(FmtSpan::CLOSE)
+        // no timestamp, with elapsed
+        .with_timer(NoTime)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -63,7 +75,6 @@ mod lambda {
 
     pub fn init_tracing() {
         default_subscriber_builder("debug")
-            .without_time()
             .with_ansi(false)
             .with_target(false)
             .init();
