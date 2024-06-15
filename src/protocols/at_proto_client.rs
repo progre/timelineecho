@@ -6,7 +6,10 @@ use atrium_api::{
     agent::{store::MemorySessionStore, AtpAgent},
     app, com,
     records::KnownRecord,
-    types::string::{Datetime, Nsid},
+    types::{
+        string::{Datetime, Nsid},
+        LimitedNonZeroU8,
+    },
 };
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use chrono::{DateTime, FixedOffset};
@@ -96,7 +99,7 @@ impl super::Client for Client {
             actor: session.did.clone().into(),
             cursor: None,
             filter: None,
-            limit: None,
+            limit: Some(LimitedNonZeroU8::try_from(50).unwrap()),
         };
         let output = self
             .agent
