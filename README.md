@@ -2,18 +2,18 @@
 
 ### on Windows
 
-```
-> cargo lambda build --release --compiler cross
+```powershell
+cargo lambda build --release --compiler cross
 ```
 
 ### on macOS
 
-```
-$ cargo lambda build --release
+```bash
+cargo lambda build --release
 ```
 
 ## Deploy
 
-```
-$ cargo lambda deploy --profile ???
+```bash
+cargo lambda deploy --profile ???
 ```

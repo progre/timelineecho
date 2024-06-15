@@ -1,6 +1,11 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use anyhow::{Ok, Result};
+use futures::future::join_all;
 use tokio::{spawn, time::sleep};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, trace};
@@ -27,9 +32,15 @@ pub async fn do_main_task(
     trace!("do_main_task");
     let http_client = Arc::new(reqwest::Client::new());
     let mut dst_client_map = HashMap::new();
-    for config_user in &config.users {
-        get(&http_client, config_user, store, &mut dst_client_map).await?;
+    let store = Mutex::new(store);
+    let users = config.users.iter();
+    let futures = users.map(|config_user| get(&http_client, config_user, &store));
+    for result in join_all(futures).await {
+        if let Some((src_account_key, dst_clients)) = result? {
+            dst_client_map.insert(src_account_key, dst_clients);
+        }
     }
+    let store = store.into_inner().unwrap();
     if cancellation_token.is_cancelled() {
         debug!("cancel accepted");
         return Ok(());

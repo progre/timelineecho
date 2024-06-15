@@ -1,4 +1,7 @@
-use std::{collections::HashMap, convert::Into, sync::Arc};
+use std::{
+    convert::Into,
+    sync::{Arc, Mutex},
+};
 
 use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
@@ -118,29 +121,38 @@ fn has_users_operations(operations: &[store::operations::Operation], src_key: &A
 pub async fn get(
     http_client: &Arc<reqwest::Client>,
     config_user: &config::User,
-    store: &mut store::Store,
-    dst_client_map: &mut HashMap<AccountKey, Vec<Box<dyn Client>>>,
-) -> Result<()> {
+    store: &Mutex<&mut store::Store>,
+) -> Result<Option<(AccountKey, Vec<Box<dyn Client>>)>> {
     let mut src_client = create_client(http_client.clone(), &config_user.src).await?;
-    let src_account_key = src_client.to_account_key();
 
-    let has_users_operations = has_users_operations(&store.operations, &src_account_key);
-    let stored_user = store.get_or_create_user_mut(&src_account_key);
-    let src = &mut stored_user.src;
+    let src_account_key = src_client.to_account_key();
+    let (has_users_operations, src_statuses) = {
+        let mut store = store.lock().unwrap();
+        let has_users_operations = has_users_operations(&store.operations, &src_account_key);
+        let stored_user = store.get_or_create_user_mut(&src_account_key);
+        (has_users_operations, &stored_user.src.statuses.clone())
+    };
 
     let (statuses, operations) =
-        fetch_statuses(src_client.as_mut(), http_client.as_ref(), &src.statuses).await?;
-    src.statuses = statuses;
-    trace!("new operations: {:?}", operations);
+        fetch_statuses(src_client.as_mut(), http_client.as_ref(), src_statuses).await?;
 
-    if !operations.is_empty() || has_users_operations {
-        let dst_clients = create_clients(http_client, &config_user.dsts).await?;
-        if !operations.is_empty() {
-            merge_operations(store, &dst_clients, &src_account_key, &operations);
-        }
-        dst_client_map.insert(src_client.to_account_key(), dst_clients);
+    {
+        let mut store = store.lock().unwrap();
+        let stored_user = store.get_or_create_user_mut(&src_account_key);
+        stored_user.src.statuses = statuses;
     }
-    Ok(())
+    trace!("new operations: {:?}", operations);
+    if operations.is_empty() && !has_users_operations {
+        return Ok(None);
+    }
+
+    let dst_clients = create_clients(http_client, &config_user.dsts).await?;
+
+    if !operations.is_empty() {
+        let mut store = store.lock().unwrap();
+        merge_operations(&mut store, &dst_clients, &src_account_key, &operations);
+    }
+    Ok(Some((src_account_key, dst_clients)))
 }
 
 /**
