@@ -63,7 +63,7 @@ pub async fn app(database: impl Database) -> Result<()> {
     spawn({
         let cancellation_token = cancellation_token.clone();
         async move {
-            sleep(Duration::from_secs(20)).await;
+            sleep(Duration::from_secs(60 + 20)).await;
             debug!("cancel request");
             cancellation_token.cancel();
         }
