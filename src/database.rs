@@ -41,10 +41,10 @@ impl Database for File {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DynamoDBConfigRoot {
+pub struct DynamoDBConfig {
     #[allow(unused)]
     id: u64,
-    config_json: String,
+    json: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -69,18 +69,16 @@ impl DynamoDB {
 impl Database for DynamoDB {
     #[tracing::instrument(name = "dynamodb::Database::config", skip_all)]
     async fn config(&self) -> Result<Config> {
-        let item = self
+        let req = self
             .client
             .get_item()
-            .table_name("root")
-            .set_key(Some(HashMap::from([("id".into(), to_attribute_value(1)?)])))
+            .table_name("Config")
+            .set_key(Some(HashMap::from([("id".into(), to_attribute_value(0)?)])))
             .send()
-            .await?
-            .item()
-            .ok_or_else(|| anyhow!("object not found"))?
-            .clone();
-        let root: DynamoDBConfigRoot = from_item(item)?;
-        Ok(serde_json::from_str(&root.config_json)?)
+            .await?;
+        let item = req.item().ok_or_else(|| anyhow!("object not found"))?;
+        let item: DynamoDBConfig = from_item(item.clone())?;
+        Ok(serde_json::from_str(&item.json)?)
     }
 
     #[tracing::instrument(name = "dynamodb::Database::fetch", skip_all)]
