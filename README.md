@@ -17,6 +17,23 @@ aws dynamodb put-item \
     "id": { "N": "0" },
     "json": { "S": "..." }
   }'
+
+aws dynamodb create-table \
+  --table-name Store \
+  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+  --key-schema \
+  AttributeName=id,KeyType=HASH \
+  --attribute-definitions \
+  AttributeName=id,AttributeType=N
+aws dynamodb update-table \
+  --table-name Store \
+  --deletion-protection-enabled
+aws dynamodb put-item \
+  --table-name Store \
+  --item '{
+    "id": { "N": "0" },
+    "json": { "S": "..." }
+  }'
 ```
 
 ## Build

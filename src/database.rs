@@ -48,9 +48,9 @@ pub struct DynamoDBConfig {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct DynamoDBRoot {
+pub struct DynamoDBStore {
     id: u64,
-    store: store::Store,
+    store: String,
 }
 
 pub struct DynamoDB {
@@ -69,47 +69,45 @@ impl DynamoDB {
 impl Database for DynamoDB {
     #[tracing::instrument(name = "dynamodb::Database::config", skip_all)]
     async fn config(&self) -> Result<Config> {
-        let req = self
+        let output = self
             .client
             .get_item()
             .table_name("Config")
             .set_key(Some(HashMap::from([("id".into(), to_attribute_value(0)?)])))
             .send()
             .await?;
-        let item = req.item().ok_or_else(|| anyhow!("object not found"))?;
+        let item = output.item().ok_or_else(|| anyhow!("object not found"))?;
         let item: DynamoDBConfig = from_item(item.clone())?;
         Ok(serde_json::from_str(&item.json)?)
     }
 
     #[tracing::instrument(name = "dynamodb::Database::fetch", skip_all)]
     async fn fetch(&self) -> Result<store::Store> {
-        let item = self
+        let output = self
             .client
             .get_item()
-            .table_name("root")
+            .table_name("Store")
             .set_key(Some(HashMap::from([("id".into(), to_attribute_value(0)?)])))
             .send()
-            .await?
-            .item()
-            .ok_or_else(|| anyhow!("object not found"))?
-            .clone();
-        let root: DynamoDBRoot = from_item(item)?;
-        Ok(root.store)
+            .await?;
+        let item = output.item().ok_or_else(|| anyhow!("object not found"))?;
+        let root: DynamoDBStore = from_item(item.clone())?;
+        Ok(serde_json::from_str(&root.store)?)
     }
 
     #[tracing::instrument(name = "dynamodb::Database::commit", skip_all)]
     async fn commit(&self, store: &store::Store) -> Result<()> {
         info!("commit to dynamodb...");
-        let store = DynamoDBRoot {
+        let store = DynamoDBStore {
             id: 0,
-            store: store.clone(),
+            store: serde_json::to_string(&store)?,
         };
         let item: HashMap<_, _> = to_item(store)?;
         loop {
             let res = self
                 .client
                 .put_item()
-                .table_name("root")
+                .table_name("Store")
                 .set_item(Some(item.clone()))
                 .send()
                 .await;
@@ -121,8 +119,7 @@ impl Database for DynamoDB {
             }
             break;
         }
-        info!("commit succeeded and sleep 10 secs...");
-        sleep(Duration::from_secs(10)).await;
+        info!("commit succeeded");
         Ok(())
     }
 }
